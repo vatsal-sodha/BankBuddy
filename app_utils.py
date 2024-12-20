@@ -3,10 +3,15 @@ transaction_headers = {'Date', 'Description', 'Amount',
                        'Category', 'Trans Date', 'Post Date'}
 
 def is_transactions_table(headers):
-    return any(header in headers for header in transaction_headers)
+    return any(
+        isinstance(header, str) and any(th.lower() in header.lower() for th in transaction_headers)
+        for header in headers
+    )
 
 def is_valid_transactions_table(table_df):
-    headers = table_df[0]  # First row is assumed to be the header
-    return is_transactions_table(headers)
+    if not table_df.empty or table_df.columns.size > 0 :
+        headers = table_df.columns  # First row is assumed to be the header
+        return is_transactions_table(headers)
+    return False
 
 

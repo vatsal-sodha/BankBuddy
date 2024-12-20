@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-
+import {Button, Typography} from '@mui/material/';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const UploadPDF = () => {
     const [file, setFile] = useState(null);
@@ -20,12 +21,16 @@ const UploadPDF = () => {
         formData.append('file', file);
 
         try {
-            const res = await axios.post('http://127.0.0.1:5000/upload-pdf', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-            setResponse(res.data.message || "File uploaded and processed successfully.");
+            const response = await fetch('http://127.0.0.1:5000/upload-pdf', {
+                method: 'POST',
+                body: formData,
+            })
+            if (response.ok) {
+                alert('File uploaded successfully!');
+                setFile(null);
+              } else {
+                throw new Error('Upload failed');
+              }
         } catch (error) {
             console.error("Error uploading PDF:", error);
             setResponse("An error occurred while uploading the PDF.");
@@ -35,8 +40,21 @@ const UploadPDF = () => {
     return (
         <div style={{ padding: "20px", maxWidth: "600px", margin: "auto" }}>
             <h1>Upload PDF</h1>
-            <input type="file" accept="application/pdf" onChange={handleFileChange} />
-            <button onClick={handleUpload} style={{ marginLeft: "10px" }}>Upload</button>
+            <Button
+            component="label"
+            role={undefined}
+            variant="contained"
+            tabIndex={-1}
+            startIcon={<CloudUploadIcon />}
+            onchange={handleFileChange}
+            >
+            <input type="file" accept="application/pdf" onChange={handleFileChange} hidden/> 
+            Choose files
+            </Button>
+            <Typography variant="body2">
+            {file && <span>{file.name}</span>}</Typography>
+            <br/>
+            <Button variant="contained" onClick={handleUpload} style={{ margin: "20px" }}>Upload</Button>
             <div style={{ marginTop: "20px" }}>
                 <strong>Response:</strong> <p>{response}</p>
             </div>
