@@ -3,8 +3,10 @@ from flask_cors import CORS
 import os
 from docling.document_converter import DocumentConverter
 import pandas as pd
+from app_utils import *
 
 app = Flask(__name__)
+app.debug = True
 CORS(app)
 
 # Directory to temporarily store uploaded files
@@ -26,13 +28,17 @@ def upload_pdf():
 
     # Save the file temporarily
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(file_path)
     print(file.filename)
     converter = DocumentConverter()
-    result = converter.convert(file.filename)
+    result = converter.convert(file_path)
     df = list()
-    for table_ix, table in enumerate(result.document.tables):
-        table_df: pd.DataFrame = table.export_to_dataframe()
-        df.append(table_df)
+    for _, table in enumerate(result.document.tables):
+        table_df = table.export_to_dataframe()
+        if is_valid_transactions_table(table_df):
+            df.append(table_df)
+    print(df)
+    os.remove(file_path)
     return jsonify({"message": "file received"})
 
     # try:
