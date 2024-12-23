@@ -1,13 +1,90 @@
+import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 from docling.document_converter import DocumentConverter
 import pandas as pd
 from app_utils import *
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.debug = True
 CORS(app)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy.db'  # Use SQLite for simplicity
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+
+# Account table schema
+class Account(db.Model):
+    __tablename__ = 'accounts'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    institution = db.Column(db.String(100), nullable=True)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_modified_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_4_digit = db.Column(db.String(4), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
+
+    # Relationship to transactions
+    transactions = db.relationship('Transaction', backref='account', lazy=True)
+
+    def __repr__(self):
+        return f"<Account {self.name} - {self.last_4_digit}>"
+
+# Transaction Table Schema
+class Transaction(db.Model):
+    __tablename__ = 'transactions'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    account_name = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
+    trans_date = db.Column(db.DateTime, nullable=False)
+    description = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(100), nullable=True)
+    amount = db.Column(db.Float, nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_modified_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    comment = db.Column(db.Text, nullable=True)
+
+    def __repr__(self):
+        return f"<Transaction {self.id} - {self.amount}>"
+
+
+def add_transaction(account_id, trans_date, description, category, amount, comment=None):
+    with app.app_context():
+        new_transaction = Transaction(
+            account_id=account_id,
+            trans_date=trans_date,
+            description=description,
+            category=category,
+            amount=amount,
+            comment=comment
+        )
+
+        # Add the new transaction to the database session
+        db.session.add(new_transaction)
+        db.session.commit()
+
+    return new_transaction  # Return the created transaction
+
+def add_account(name, last_4_digit, type, institution=None):
+    with app.app_context():
+        new_account = Account(name=name, 
+                               institution=institution, 
+                               last_4_digit=last_4_digit, 
+                               type=type)
+         # Add the new transaction to the database session
+        db.session.add(new_account)
+        db.session.commit()
+    return new_account
+
+
+# Create tables
+with app.app_context():
+    db.create_all()
+
 
 # Directory to temporarily store uploaded files
 UPLOAD_FOLDER = './uploads'
