@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import {Button, Typography} from '@mui/material/';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 

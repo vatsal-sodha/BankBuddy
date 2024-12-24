@@ -20,7 +20,7 @@ db = SQLAlchemy(app)
 class Account(db.Model):
     __tablename__ = 'accounts'
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    account_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), nullable=False)
     institution = db.Column(db.String(100), nullable=True)
     created_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -38,9 +38,9 @@ class Account(db.Model):
 class Transaction(db.Model):
     __tablename__ = 'transactions'
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    account_name = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
-    trans_date = db.Column(db.DateTime, nullable=False)
+    transaction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
+    transaction_date = db.Column(db.DateTime, nullable=False)
     description = db.Column(db.String(255), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     amount = db.Column(db.Float, nullable=False)
