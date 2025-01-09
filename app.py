@@ -28,8 +28,8 @@ class Account(db.Model):
     account_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), nullable=False)
     institution = db.Column(db.String(100), nullable=True)
-    created_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_modified_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     last_4_digit = db.Column(db.String(4), nullable=False)
     type = db.Column(db.String(50), nullable=False)
 
@@ -44,13 +44,13 @@ class Transaction(db.Model):
     __tablename__ = 'transactions'
 
     transaction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
+    account_id = db.Column(db.Integer, db.ForeignKey('accounts.account_id'), nullable=False)
     transaction_date = db.Column(db.DateTime, nullable=False)
     description = db.Column(db.String(255), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     amount = db.Column(db.Float, nullable=False)
-    created_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_modified_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     comment = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
@@ -169,12 +169,15 @@ def upload_pdf():
 
     # Save the file temporarily
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(file_path)
+    print(file.filename)
+
     API_KEY = os.getenv('ANTHROPIC_API_KEY')
     if not API_KEY:
         raise ValueError("Please set ANTHROPIC_API_KEY environment variable")
     transactions = extract_transactions_from_pdf(file_path, API_KEY)
-    # file.save(file_path)
-    # print(file.filename)
+    os.remove(file_path)
+    
     # converter = DocumentConverter()
     # result = converter.convert(file_path)
     # df = list()
@@ -183,7 +186,6 @@ def upload_pdf():
     #     if is_valid_transactions_table(table_df):
     #         df.append(table_df)
     # print(df)
-    # os.remove(file_path)
     return jsonify({"message": transactions})
 
     # try:
