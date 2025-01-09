@@ -1,16 +1,21 @@
 import datetime
-from flask import Flask, request, jsonify
+from anthropic import Anthropic
+from flask import Flask, json, request, jsonify
 from flask_cors import CORS
 import os
-from docling.document_converter import DocumentConverter
-import pandas as pd
+# from docling.document_converter import DocumentConverter
+# import pandas as pd
+import pdfplumber
 from app_utils import *
 from flask_sqlalchemy import SQLAlchemy
+from privacy_filter import PrivacyFilter
+from dotenv import load_dotenv
 
+load_dotenv()
 app = Flask(__name__)
 app.debug = True
 CORS(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy.db'  # Use SQLite for simplicity
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -85,6 +90,65 @@ def add_account(name, last_4_digit, type, institution=None):
 with app.app_context():
     db.create_all()
 
+def extract_transactions_from_pdf(pdf_path, api_key):
+    """
+    Extract credit card transactions from a PDF statement using Claude AI.
+    
+    Args:
+        pdf_path (str): Path to the PDF file
+        api_key (str): Anthropic API key
+    
+    Returns:
+        list: List of transaction dictionaries
+    """
+    # Initialize Anthropic client
+    client = Anthropic(api_key=api_key)
+    privacy_filter = PrivacyFilter()
+    
+    # Extract text from PDF
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            text = "\n".join(page.extract_text() for page in pdf.pages)
+            text = privacy_filter.hash_sensitive_data(text)
+    except Exception as e:
+        raise Exception(f"Error reading PDF: {str(e)}")
+    
+    # Prepare prompt for Claude
+    prompt = f"""Below is the text from a credit card statement. 
+    Please extract all transactions and return them as a JSON array.
+    Each transaction should have these fields if available:
+    - date (in YYYY-MM-DD format)
+    - description
+    - amount
+    
+    Only return the JSON array, no other text.
+    Always format dates as YYYY-MM-DD, even if they appear differently in the statement.
+
+    Statement text:
+    {text}"""
+    # Get response from Claude
+    try:
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4000,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        response = message.content[0].text
+        
+        # Parse JSON response
+        transactions = json.loads(response)
+        
+        # Basic validation
+        if not isinstance(transactions, list):
+            raise ValueError("Response is not a JSON array")
+                    
+        return transactions
+        
+    except Exception as e:
+        raise Exception(f"Error processing with Claude: {str(e)}")
+
 
 # Directory to temporarily store uploaded files
 UPLOAD_FOLDER = './uploads'
@@ -105,18 +169,22 @@ def upload_pdf():
 
     # Save the file temporarily
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
-    print(file.filename)
-    converter = DocumentConverter()
-    result = converter.convert(file_path)
-    df = list()
-    for _, table in enumerate(result.document.tables):
-        table_df = table.export_to_dataframe()
-        if is_valid_transactions_table(table_df):
-            df.append(table_df)
-    print(df)
-    os.remove(file_path)
-    return jsonify({"message": "file received"})
+    API_KEY = os.getenv('ANTHROPIC_API_KEY')
+    if not API_KEY:
+        raise ValueError("Please set ANTHROPIC_API_KEY environment variable")
+    transactions = extract_transactions_from_pdf(file_path, API_KEY)
+    # file.save(file_path)
+    # print(file.filename)
+    # converter = DocumentConverter()
+    # result = converter.convert(file_path)
+    # df = list()
+    # for _, table in enumerate(result.document.tables):
+    #     table_df = table.export_to_dataframe()
+    #     if is_valid_transactions_table(table_df):
+    #         df.append(table_df)
+    # print(df)
+    # os.remove(file_path)
+    return jsonify({"message": transactions})
 
     # try:
     #     # Extract text from the PDF
