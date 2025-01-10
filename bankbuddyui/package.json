@@ -3,12 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@fontsource/roboto": "^5.1.0",
+    "@mui/icons-material": "^6.2.1",
+    "@mui/lab": "^6.0.0-beta.22",
+    "@mui/material": "^6.2.1",
+    "ag-grid-react": "^33.0.3",
     "axios": "^1.7.9",
     "cra-template": "1.2.0",
     "nth-check": "^2.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-scripts": "5.0.1"
+    "react-scripts": "^5.0.1"
   },
   "overrides": {
     "nth-check": "$nth-check"
