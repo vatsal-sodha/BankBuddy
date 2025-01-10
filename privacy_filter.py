@@ -18,12 +18,8 @@ class PrivacyFilter:
         """Hash sensitive data while optionally preserving last 4 digits"""
         if not text:
             return text
-            
-        def hash_match(match):
-            full_text = match.group(0)
-            return "****"
                 
         redacted = text
         for _, pattern in self.patterns.items():
-            redacted = re.sub(pattern, hash_match, redacted)
+            redacted = re.sub(pattern, "****", redacted)
         return redacted
