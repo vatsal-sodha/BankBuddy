@@ -11,99 +11,16 @@ from app_utils import *
 from flask_sqlalchemy import SQLAlchemy
 from privacy_filter import PrivacyFilter
 from dotenv import load_dotenv
-
+from models.account import Account
+from models.transaction import Transaction
+from models import db
 load_dotenv()
 app = Flask(__name__)
 app.debug = True
 CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-
-
-# Account table schema
-class Account(db.Model):
-    __tablename__ = 'accounts'
-
-    account_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(100), nullable=False)
-    institution = db.Column(db.String(100), nullable=True)
-    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
-    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
-    last_4_digits = db.Column(db.String(4), nullable=False)
-    type = db.Column(db.String(50), nullable=False)
-
-    # Relationship to transactions
-    transactions = db.relationship('Transaction', backref='account', lazy=True)
-    # Ensure combination of account_name, type, and last_4_digits is unique
-    __table_args__ = (
-        UniqueConstraint('name', 'last_4_digits', 'type', name='uix_account_unique'),
-    )
-
-    def __repr__(self):
-        return f"<Account {self.name} - {self.last_4_digits}>"
-    
-    def to_dict(self):
-        return {
-            "account_id": self.account_id,
-            "name": self.name,
-            "institution": self.institution,
-            "created_date": self.created_date.isoformat(),
-            "last_modified_date": self.last_modified_date.isoformat(),
-            "last_4_digits": self.last_4_digits,
-            "type": self.type
-        }
-
-# Transaction Table Schema
-class Transaction(db.Model):
-    __tablename__ = 'transactions'
-
-    transaction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    account_id = db.Column(db.Integer, db.ForeignKey('accounts.account_id'), nullable=False)
-    transaction_date = db.Column(db.DateTime, nullable=False)
-    description = db.Column(db.String(255), nullable=False)
-    category = db.Column(db.String(100), nullable=True)
-    amount = db.Column(db.Float, nullable=False)
-    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
-    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
-    comment = db.Column(db.Text, nullable=True)
-
-    def __repr__(self):
-        return f"<Transaction {self.id} - {self.amount}>"
-
-
-def add_transaction(account_id, trans_date, description, category, amount, comment=None):
-    with app.app_context():
-        new_transaction = Transaction(
-            account_id=account_id,
-            trans_date=trans_date,
-            description=description,
-            category=category,
-            amount=amount,
-            comment=comment
-        )
-
-        # Add the new transaction to the database session
-        db.session.add(new_transaction)
-        db.session.commit()
-
-    return new_transaction  # Return the created transaction
-
-def add_account(name, last_4_digits, type, institution=None):
-    new_account = Account(name=name, 
-                               institution=institution, 
-                               last_4_digits=last_4_digits, 
-                               type=type)
-         # Add the new transaction to the database session
-    db.session.add(new_account)
-    db.session.commit()
-    return new_account.account_id
-
-def get_all_accounts_from_db():
-    accounts = Account.query.all()
-    return [account.to_dict() for account in accounts]
-
+db.init_app(app)
 # Create tables
 with app.app_context():
     db.create_all()
@@ -166,8 +83,8 @@ def extract_transactions_from_pdf(pdf_path, api_key):
         
     except Exception as e:
         raise Exception(f"Error processing with Claude: {str(e)}")
-
-
+    
+ 
 # Directory to temporarily store uploaded files
 UPLOAD_FOLDER = './uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -196,7 +113,7 @@ def create_account():
         if existing_account:
             raise ValueError("Account with the same name, type, and last 4 digits already exists.")
 
-        account_id = add_account(data['account_name'], data['last_4_digits'], data['account_type'], data['institution'])
+        account_id = Account.add_account(data['account_name'], data['last_4_digits'], data['account_type'], data['institution'])
         return jsonify({
             'message': 'Account created successfully',
             "account_id": account_id
@@ -259,6 +176,11 @@ def upload_pdf():
     #     return jsonify({"message": "PDF processed successfully.", "text": text})
     # except Exception as e:
     #     return jsonify({"error": f"An error occurred while reading the PDF: {str(e)}"}), 500
+    
+def get_all_accounts_from_db():
+    with app.app_context():
+        accounts = Account.query.all()
+        return [account.to_dict() for account in accounts]
 
 if __name__ == '__main__':
     app.run(host='localhost', port=5000, debug=True)
