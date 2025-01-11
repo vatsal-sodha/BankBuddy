@@ -17,7 +17,7 @@ const AddAccountDialog = ({ open, onClose, onSubmit }) => {
     account_name: '',
     institution: '',
     account_type: '',
-    last_4_digit: ''
+    last_4_digits: ''
   });
 
   const handleChange = (e) => {
@@ -35,7 +35,7 @@ const AddAccountDialog = ({ open, onClose, onSubmit }) => {
       account_name: '',
       institution: '',
       account_type: '',
-      last_4_digit: ''
+      last_4_digits: ''
     });
   };
 
@@ -83,11 +83,11 @@ const AddAccountDialog = ({ open, onClose, onSubmit }) => {
           </FormControl>
           <TextField
             margin="dense"
-            name="last_4_digit"
+            name="last_4_digits"
             label="Last 4 Digits"
             type="text"
             fullWidth
-            value={formData.last_4_digit}
+            value={formData.last_4_digits}
             onChange={handleChange}
             required
             inputProps={{

@@ -3,6 +3,7 @@ from anthropic import Anthropic
 from flask import Flask, json, request, jsonify
 from flask_cors import CORS
 import os
+from sqlalchemy import UniqueConstraint
 # from docling.document_converter import DocumentConverter
 # import pandas as pd
 import pdfplumber
@@ -30,14 +31,29 @@ class Account(db.Model):
     institution = db.Column(db.String(100), nullable=True)
     created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
     last_modified_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
-    last_4_digit = db.Column(db.String(4), nullable=False)
+    last_4_digits = db.Column(db.String(4), nullable=False)
     type = db.Column(db.String(50), nullable=False)
 
     # Relationship to transactions
     transactions = db.relationship('Transaction', backref='account', lazy=True)
+    # Ensure combination of account_name, type, and last_4_digits is unique
+    __table_args__ = (
+        UniqueConstraint('name', 'last_4_digits', 'type', name='uix_account_unique'),
+    )
 
     def __repr__(self):
-        return f"<Account {self.name} - {self.last_4_digit}>"
+        return f"<Account {self.name} - {self.last_4_digits}>"
+    
+    def to_dict(self):
+        return {
+            "account_id": self.account_id,
+            "name": self.name,
+            "institution": self.institution,
+            "created_date": self.created_date.isoformat(),
+            "last_modified_date": self.last_modified_date.isoformat(),
+            "last_4_digits": self.last_4_digits,
+            "type": self.type
+        }
 
 # Transaction Table Schema
 class Transaction(db.Model):
@@ -74,17 +90,19 @@ def add_transaction(account_id, trans_date, description, category, amount, comme
 
     return new_transaction  # Return the created transaction
 
-def add_account(name, last_4_digit, type, institution=None):
-    with app.app_context():
-        new_account = Account(name=name, 
+def add_account(name, last_4_digits, type, institution=None):
+    new_account = Account(name=name, 
                                institution=institution, 
-                               last_4_digit=last_4_digit, 
+                               last_4_digits=last_4_digits, 
                                type=type)
          # Add the new transaction to the database session
-        db.session.add(new_account)
-        db.session.commit()
-    return new_account
+    db.session.add(new_account)
+    db.session.commit()
+    return new_account.account_id
 
+def get_all_accounts_from_db():
+    accounts = Account.query.all()
+    return [account.to_dict() for account in accounts]
 
 # Create tables
 with app.app_context():
@@ -155,6 +173,46 @@ UPLOAD_FOLDER = './uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
+@app.route('/api/get-all-accounts', methods=['GET'])
+def get_all_accounts():
+    accounts = get_all_accounts_from_db()
+    return jsonify(accounts), 200
+
+@app.route('/api/create-account', methods=['POST'])
+def create_account():
+    try:
+        data = request.json
+        # Validate required fields
+        required_fields = ['account_name', 'institution', 'account_type', 'last_4_digits']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        existing_account = Account.query.filter(
+            (Account.name == data['account_name']) &
+            (Account.last_4_digits == data['last_4_digits']) &
+            (Account.type == data['account_type'])
+        ).first()
+
+        if existing_account:
+            raise ValueError("Account with the same name, type, and last 4 digits already exists.")
+
+        account_id = add_account(data['account_name'], data['last_4_digits'], data['account_type'], data['institution'])
+        return jsonify({
+            'message': 'Account created successfully',
+            "account_id": account_id
+        }), 201
+    except ValueError as e:
+        return jsonify({
+            'error': 'Account with the same name, type, and last 4 digits already exists.',
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e)
+        }), 500
+
+        
 @app.route('/upload-pdf', methods=['POST'])
 def upload_pdf():
     if 'file' not in request.files:
