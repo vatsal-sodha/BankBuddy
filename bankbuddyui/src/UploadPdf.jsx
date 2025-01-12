@@ -16,10 +16,6 @@ import {
 import Toast from './Toast';
 
 const UploadPDF = ({ open, onClose }) => {
-    const [formData, setFormData] = useState({
-        file: '',
-        account_id: ''
-      });
     const [selectedAccount, setSelectedAccount] = useState('');
     const [accounts, setAccounts] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -39,7 +35,6 @@ const UploadPDF = ({ open, onClose }) => {
     };
     
     const [file, setFile] = useState(null);
-    const [response, setResponse] = useState("");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -59,7 +54,7 @@ const UploadPDF = ({ open, onClose }) => {
         formData.append('account_id', selectedAccount);
 
         try {
-            const response = await fetch('http://127.0.0.1:5000/upload-pdf', {
+            const response = await fetch('http://127.0.0.1:5000/api/upload-statement', {
                 method: 'POST',
                 body: formData,
             });

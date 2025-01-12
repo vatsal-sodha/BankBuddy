@@ -10,8 +10,6 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import UploadPDF from './UploadPdf';
 
-// import 'ag-grid-community/styles/ag-grid.css';
-// import 'ag-grid-community/styles/ag-theme-material.css';
 const TransactionsTab = () => {
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
@@ -43,7 +41,7 @@ const TransactionsTab = () => {
     ]);
   
     return (
-      // <Paper sx={{  }}>
+      <Paper sx={{  }}>
       <Box>
         <Box sx={{ display: 'flex'}}>
           <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -59,37 +57,41 @@ const TransactionsTab = () => {
                 onChange={setToDate}
               />
           </LocalizationProvider>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
           <Button
+              variant="contained"
+              >Generate Report</Button>
+          <Button
+              sx={{ marginLeft: "auto"}}
               variant="contained"
               startIcon={<CloudUploadIcon />}
               onClick={handleClickOpen}
           >
               Upload Statement
           </Button>
+          <UploadPDF
+            open={openDialog}
+            onClose={handleClose}
+          />
           </Box>
-        <UploadPDF
-          open={openDialog}
-          onClose={handleClose}
-        />
-        </Box>
-
+          {/* <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          
+          </Box> */}
+          </Box>
         
-        // <div className="ag-theme-material" style={{ height: 400, width: '100%' }}>
-        //   <AgGridReact
-        //     rowData={rowData}
-        //     columnDefs={columnDefs}
-        //     defaultColDef={{
-        //       flex: 1,
-        //       minWidth: 100,
-        //       filter: true,
-        //       sortable: true,
-        //     }}
-        //   />
+        {/* <div className="ag-theme-material" style={{ height: 400, width: '100%' }}> */}
+          <AgGridReact
+            rowData={rowData}
+            columnDefs={columnDefs}
+            defaultColDef={{
+              flex: 1,
+              minWidth: 100,
+              filter: true,
+              sortable: true,
+            }}
+          />
 
-        // </div>
-      // </Paper>
+        {/* </div> */}
+      </Paper>
     );
   };
   

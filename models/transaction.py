@@ -18,19 +18,19 @@ class Transaction(db.Model):
     def __repr__(self):
         return f"<Transaction {self.id} - {self.amount}>"
 
+    @classmethod
+    def add_transaction(cls, account_id, trans_date, description, category, amount, comment=None):
+        new_transaction = cls(
+            account_id=account_id,
+            trans_date=trans_date,
+            description=description,
+            category=category,
+            amount=amount,
+            comment=comment
+        )
 
-def add_transaction(account_id, trans_date, description, category, amount, comment=None):
-    new_transaction = Transaction(
-        account_id=account_id,
-        trans_date=trans_date,
-        description=description,
-        category=category,
-        amount=amount,
-        comment=comment
-    )
+        # Add the new transaction to the database session
+        db.session.add(new_transaction)
+        db.session.commit()
 
-    # Add the new transaction to the database session
-    db.session.add(new_transaction)
-    db.session.commit()
-
-    return new_transaction  # Return the created transaction
+        return new_transaction  # Return the created transaction
