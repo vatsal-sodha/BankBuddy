@@ -12,7 +12,7 @@ import {
     Select,
     MenuItem,
     Box,
-  } from '@mui/material';import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+} from '@mui/material'; import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import Toast from './Toast';
 
 const UploadPDF = ({ open, onClose }) => {
@@ -20,25 +20,25 @@ const UploadPDF = ({ open, onClose }) => {
     const [accounts, setAccounts] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [toast, setToast] = useState({
-              open: false,
-              message: '',
-              severity: 'success'
-            });
+        open: false,
+        message: '',
+        severity: 'success'
+    });
     const handleToastClose = (event, reason) => {
         if (reason === 'clickaway') {
             return;
         }
         setToast({ ...toast, open: false });
-        };
+    };
     const handleAccountChange = (event) => {
         setSelectedAccount(event.target.value);
     };
-    
+
     const [file, setFile] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!file || !selectedAccount) {
             setToast({
                 open: true,
@@ -113,67 +113,67 @@ const UploadPDF = ({ open, onClose }) => {
 
     return (
         <Box>
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <form onSubmit={handleSubmit}>
-                <DialogTitle>Upload Bank Statement</DialogTitle>
-                <DialogContent>
-                    <FormControl fullWidth required sx={{ mb: 2 }}>
-                    <InputLabel>Account</InputLabel>
-                    <Select
-                        name="account_type"
-                        value={selectedAccount}
-                        label="Account"
-                        onChange={handleAccountChange}
-                    >
-                    {accounts.map((account) => (
-                        <MenuItem key={account.account_id} value={account.account_id}>{account.name + "-" + account.last_4_digits}</MenuItem>
-                    ))}     
-                    </Select>
-                    </FormControl>
-                    <div>
-                        <Button
-                            component="label"
-                            variant="contained"
-                            startIcon={<CloudUploadIcon />}
-                            sx={{ mb: 2 }}
-                        >
-                            Upload PDF
-                            <input
-                                type="file"
-                                accept="application/pdf"
-                                onChange={handleFileChange}
-                                hidden
-                            />
-                        </Button>
-                        {file && (
-                            <Typography variant="body2" sx={{ ml: 1 }}>
-                                Selected file: {file.name}
-                            </Typography>
-                        )}
-                    </div>
+            <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+                <form onSubmit={handleSubmit}>
+                    <DialogTitle>Upload Bank Statement</DialogTitle>
+                    <DialogContent>
+                        <FormControl fullWidth required sx={{ mb: 2 }}>
+                            <InputLabel>Account</InputLabel>
+                            <Select
+                                name="account_type"
+                                value={selectedAccount}
+                                label="Account"
+                                onChange={handleAccountChange}
+                            >
+                                {accounts.map((account) => (
+                                    <MenuItem key={account.account_id} value={account.account_id}>{account.name + "-" + account.last_4_digits}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <div>
+                            <Button
+                                component="label"
+                                variant="contained"
+                                startIcon={<CloudUploadIcon />}
+                                sx={{ mb: 2 }}
+                            >
+                                Upload PDF
+                                <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    onChange={handleFileChange}
+                                    hidden
+                                />
+                            </Button>
+                            {file && (
+                                <Typography variant="body2" sx={{ ml: 1 }}>
+                                    Selected file: {file.name}
+                                </Typography>
+                            )}
+                        </div>
 
-                </DialogContent>
-                <DialogActions>
-                    <Button 
-                        onClick={onClose}
-                        disabled={isLoading}
-                    >Cancel</Button>
-                    <Button 
-                        type="submit" 
-                        variant="contained"
-                        startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
-                        disabled={!file || !selectedAccount || isLoading}>
-                        {isLoading ? 'Uploading...' : 'Submit'}
-                    </Button>
-                </DialogActions>
-            </form>
-        </Dialog>
-        <Toast
-            open={toast.open}
-            message={toast.message}
-            severity={toast.severity}
-            onClose={handleToastClose}
-        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            onClick={onClose}
+                            disabled={isLoading}
+                        >Cancel</Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
+                            disabled={!file || !selectedAccount || isLoading}>
+                            {isLoading ? 'Uploading...' : 'Submit'}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+            <Toast
+                open={toast.open}
+                message={toast.message}
+                severity={toast.severity}
+                onClose={handleToastClose}
+            />
         </Box>
 
     );
