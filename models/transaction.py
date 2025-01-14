@@ -34,3 +34,16 @@ class Transaction(db.Model):
         db.session.commit()
 
         return new_transaction  # Return the created transaction
+    
+    @classmethod
+    def get_transactions_in_date_range(cls, from_date, to_date):
+        """
+        Retrieve all transactions between from_date and to_date
+        
+        :param from_date: Start date as a datetime object.
+        :param to_date: End date as a datetime object.
+        :return: List of transactions within the date range.
+        """
+        query = cls.query.filter(cls.transaction_date >= from_date, cls.transaction_date <= to_date)
+
+        return query.all()

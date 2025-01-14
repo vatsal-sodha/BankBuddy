@@ -1,21 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { Paper, Box, Button } from '@mui/material';
-import { AgGridReact } from 'ag-grid-react';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-material.css';
+import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
+import { AgGridReact } from "ag-grid-react";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import UploadPDF from './UploadPdf';
-import { positions } from '@mui/system';
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 
 const TransactionsTab = () => {
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
     const [openDialog, setOpenDialog] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [toast, setToast] = useState({
         open: false,
         message: '',
@@ -61,7 +61,9 @@ const TransactionsTab = () => {
                 </LocalizationProvider>
                 <Button sx={{ ml: 2 }}
                     variant="contained"
-                >Generate Report</Button>
+                >
+                    Generate Report
+                </Button>
                 <Button
                     sx={{ float: "right" }}
                     variant="contained"
@@ -74,24 +76,21 @@ const TransactionsTab = () => {
                     open={openDialog}
                     onClose={handleClose}
                 />
-                {/* <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          
-          </Box> */}
             </Box>
 
-            {/* <div className="ag-theme-material" style={{ height: 400, width: '100%' }}> */}
-            <AgGridReact
-                rowData={rowData}
-                columnDefs={columnDefs}
-                defaultColDef={{
-                    flex: 1,
-                    minWidth: 100,
-                    filter: true,
-                    sortable: true,
-                }}
-            />
+            <div className="ag-theme-material" style={{ height: 400, width: '100%', marginTop: 5 }}>
+                <AgGridReact
+                    rowData={rowData}
+                    columnDefs={columnDefs}
+                    defaultColDef={{
+                        flex: 1,
+                        minWidth: 100,
+                        filter: true,
+                        sortable: true,
+                    }}
+                />
 
-            {/* </div> */}
+            </div>
         </Paper>
     );
 };

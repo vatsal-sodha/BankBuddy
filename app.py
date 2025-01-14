@@ -55,9 +55,24 @@ def extract_transactions_from_pdf(pdf_path, api_key):
     - date (in YYYY-MM-DD format)
     - description
     - amount
+    - category
     
     Only return the JSON array, no other text.
-    Always format dates as YYYY-MM-DD, even if they appear differently in the statement.
+    Always format dates as YYYY-MM-DD, even if they appear differently in the statement. 
+    Also if year is missing infer the year from rest of the texts and return in it YYYY-MM-DD format
+
+    - Can you please also classify the transaction based on the description of the transaction 
+    among one of the categories from below:
+    - paycheck, other income,
+    - transfer, credit card payment
+    - home, utilities
+    - auto, gas, parking, travel
+    - restaurant, groceries, medical
+    - amazon, walmart, shopping
+    - subscriptions, donations, insurance
+    - investments, other expenses
+    
+    All categories above are comma separated and do return category for each transaction
 
     Statement text:
     {text}"""
@@ -89,6 +104,48 @@ def extract_transactions_from_pdf(pdf_path, api_key):
 UPLOAD_FOLDER = './uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+@app.route('/api/get-transactions', methods=['GET'])
+def get_transactions():
+    try:
+        from_date_str = request.args.get('fromDate')
+        to_date_str = request.args.get('toDate')
+
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+
+        if from_date > to_date:
+            return jsonify({"error": "fromDate cannot be after toDate."}), 400
+        
+        transactions = Transaction.get_transactions_in_date_range(from_date, to_date)
+        result = []
+        for transaction in transactions:
+            account = transaction.account  # Access the account using the relationship
+            result.append({
+                "transaction_id": transaction.transaction_id,
+                "transaction_date": transaction.transaction_date.isoformat(),
+                "description": transaction.description,
+                "category": transaction.category,
+                "amount": transaction.amount,
+                "comment": transaction.comment,
+                "account_name": account.name,
+                "account_institution": account.institution,
+                "last_4_digits": account.last_4_digits,
+                "account_type": account.type
+            })
+
+        # Return the result as JSON
+        return jsonify({"transactions": result})
+    except ValueError as ve:
+        # Handle invalid date format
+        return jsonify({"error": f"Invalid date format. {ve}"}), 400
+
+    except Exception as e:
+        # Handle unexpected errors
+        return jsonify({"error": "An error occurred.", "details": str(e)}), 500
+
+
+    
 
 @app.route('/api/get-all-accounts', methods=['GET'])
 def get_all_accounts():
@@ -130,8 +187,12 @@ def create_account():
         }), 500
 
         
-@app.route('/upload-pdf', methods=['POST'])
+@app.route('/api/upload-statement', methods=['POST'])
 def upload_pdf():
+    # Get the account_id from the form data
+    account_id = request.form.get('account_id')
+    if not account_id:
+        return jsonify({'error': 'Account ID is required'}), 400
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -146,13 +207,41 @@ def upload_pdf():
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(file_path)
     print(file.filename)
+    print(account_id)
 
     API_KEY = os.getenv('ANTHROPIC_API_KEY')
     if not API_KEY:
         raise ValueError("Please set ANTHROPIC_API_KEY environment variable")
-    transactions = extract_transactions_from_pdf(file_path, API_KEY)
-    os.remove(file_path)
     
+    # transactions = extract_transactions_from_pdf(file_path, API_KEY)
+    # transaction_ids = add_trasactions_to_db(transactions, account_id)
+    os.remove(file_path)
+    return jsonify({"messagge": "file received"})
+
+def add_trasactions_to_db(transactions, account_id):
+    transaction_ids = []
+    for transaction in transactions:
+        # Extract fields from the transaction dictionary
+        trans_date = transaction.get('trans_date')
+        description = transaction.get('description')
+        category = transaction.get('category')
+        amount = transaction.get('amount')
+        comment = transaction.get('comment', None)
+
+        try:
+            new_transaction = Transaction.add_transaction(
+                account_id=account_id,
+                trans_date=trans_date,
+                description=description,
+                category=category,
+                amount=amount,
+                comment=comment)
+            print(f"Added transaction: {new_transaction.transaction_id}")
+            transaction_ids.append(new_transaction.transaction_id)
+        except Exception as e:
+            print(f"Failed to add transaction for {transaction}: {e}")
+    return transaction_ids
+
     # converter = DocumentConverter()
     # result = converter.convert(file_path)
     # df = list()
@@ -161,7 +250,7 @@ def upload_pdf():
     #     if is_valid_transactions_table(table_df):
     #         df.append(table_df)
     # print(df)
-    return jsonify({"message": transactions})
+    # return jsonify({"message": transactions})
 
     # try:
     #     # Extract text from the PDF
