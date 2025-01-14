@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from anthropic import Anthropic
 from flask import Flask, json, request, jsonify
 from flask_cors import CORS
@@ -52,7 +52,7 @@ def extract_transactions_from_pdf(pdf_path, api_key):
     prompt = f"""Below is the text from a credit card statement. 
     Please extract all transactions and return them as a JSON array.
     Each transaction should have these fields if available:
-    - date (in YYYY-MM-DD format)
+    - transaction_date (in YYYY-MM-DD format)
     - description
     - amount
     - category
@@ -131,7 +131,8 @@ def get_transactions():
                 "account_name": account.name,
                 "account_institution": account.institution,
                 "last_4_digits": account.last_4_digits,
-                "account_type": account.type
+                "account_type": account.type,
+                "account_id":account.account_id
             })
 
         # Return the result as JSON
@@ -215,29 +216,47 @@ def upload_pdf():
     
     # transactions = extract_transactions_from_pdf(file_path, API_KEY)
     # transaction_ids = add_trasactions_to_db(transactions, account_id)
+    transactions = [
+        {
+            "transaction_date": "2024-11-28",
+            "description": "AUTOMATIC PAYMENT - THANK YOU",
+            "amount": -295.42,
+            "category": "credit card payment"
+        },
+        {
+            "transaction_date": "2024-11-02",
+            "description": "PATEL BROTHERS PINEVILLE PINEVILLE NC",
+            "amount": 6.45,
+            "category": "groceries"
+        }
+    ]
+    transaction_ids = add_trasactions_to_db(transactions, account_id)
     os.remove(file_path)
-    return jsonify({"messagge": "file received"})
+    return jsonify({"message": f"""Added {len(transaction_ids)} to database"""})
 
 def add_trasactions_to_db(transactions, account_id):
     transaction_ids = []
     for transaction in transactions:
         # Extract fields from the transaction dictionary
-        trans_date = transaction.get('trans_date')
+        transaction_date_str = transaction.get('transaction_date')
         description = transaction.get('description')
         category = transaction.get('category')
         amount = transaction.get('amount')
         comment = transaction.get('comment', None)
 
         try:
+            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d')
             new_transaction = Transaction.add_transaction(
                 account_id=account_id,
-                trans_date=trans_date,
+                transaction_date=transaction_date,
                 description=description,
                 category=category,
                 amount=amount,
                 comment=comment)
             print(f"Added transaction: {new_transaction.transaction_id}")
             transaction_ids.append(new_transaction.transaction_id)
+        except ValueError as e:
+            print(f"Error parsing date: {e}")
         except Exception as e:
             print(f"Failed to add transaction for {transaction}: {e}")
     return transaction_ids

@@ -64,7 +64,7 @@ const UploadPDF = ({ open, onClose }) => {
             if (response.ok) {
                 setToast({
                     open: true,
-                    message: 'File uploaded successfully!',
+                    message: responseData.message,
                     severity: 'success'
                 });
                 setFile(null);

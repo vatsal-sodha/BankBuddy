@@ -19,10 +19,10 @@ class Transaction(db.Model):
         return f"<Transaction {self.id} - {self.amount}>"
 
     @classmethod
-    def add_transaction(cls, account_id, trans_date, description, category, amount, comment=None):
+    def add_transaction(cls, account_id, transaction_date, description, category, amount, comment=None):
         new_transaction = cls(
             account_id=account_id,
-            trans_date=trans_date,
+            transaction_date=transaction_date,
             description=description,
             category=category,
             amount=amount,
