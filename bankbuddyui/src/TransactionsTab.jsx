@@ -32,7 +32,7 @@ const TransactionsTab = () => {
     // Categories for dropdown
     const categories = [
         'paycheck', 'other income', 'transfer', 'credit card payment',
-        'home', 'utilities', 'auto', 'gas', 'parking', 'travel',
+        'home', 'utilities', 'rent', 'auto', 'gas', 'parking', 'travel',
         'restaurant', 'groceries', 'medical', 'amazon', 'walmart',
         'shopping', 'subscriptions', 'donations', 'insurance',
         'investments', 'other expenses'

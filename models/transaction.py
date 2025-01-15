@@ -18,6 +18,15 @@ class Transaction(db.Model):
     def __repr__(self):
         return f"<Transaction {self.id} - {self.amount}>"
 
+    @property
+    def key(self):
+        return (
+            self.transaction_date, 
+            self.amount, 
+            self.description, 
+            self.category, 
+            self.account_id
+        )
     @classmethod
     def add_transaction(cls, account_id, transaction_date, description, category, amount, comment=None):
         new_transaction = cls(
@@ -47,3 +56,16 @@ class Transaction(db.Model):
         query = cls.query.filter(cls.transaction_date >= from_date, cls.transaction_date <= to_date)
 
         return query.all()
+    
+    @classmethod
+    def get_transaction_by_key(cls, key):
+        """
+        Retrieve a transaction by its unique key.
+        """
+        return cls.query.filter(
+            cls.transaction_date == key[0],
+            cls.amount == key[1],
+            cls.description == key[2],
+            cls.category == key[3],
+            cls.account_id == key[4]
+        ).first()

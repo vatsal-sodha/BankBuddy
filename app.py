@@ -65,7 +65,7 @@ def extract_transactions_from_pdf(pdf_path, api_key):
     among one of the categories from below:
     - paycheck, other income,
     - transfer, credit card payment
-    - home, utilities
+    - home, utilities, rent
     - auto, gas, parking, travel
     - restaurant, groceries, medical
     - amazon, walmart, shopping
@@ -207,8 +207,6 @@ def upload_pdf():
     # Save the file temporarily
     file_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(file_path)
-    print(file.filename)
-    print(account_id)
 
     API_KEY = os.getenv('ANTHROPIC_API_KEY')
     if not API_KEY:
@@ -216,23 +214,48 @@ def upload_pdf():
     
     transactions = extract_transactions_from_pdf(file_path, API_KEY)
     transaction_ids = add_trasactions_to_db(transactions, account_id)
-    # transactions = [
-    #     {
-    #         "transaction_date": "2024-11-28",
-    #         "description": "AUTOMATIC PAYMENT - THANK YOU",
-    #         "amount": -295.42,
-    #         "category": "credit card payment"
-    #     },
-    #     {
-    #         "transaction_date": "2024-11-02",
-    #         "description": "PATEL BROTHERS PINEVILLE PINEVILLE NC",
-    #         "amount": 6.45,
-    #         "category": "groceries"
-    #     }
-    # ]
-    # transaction_ids = add_trasactions_to_db(transactions, account_id)
+
     os.remove(file_path)
-    return jsonify({"message": f"""Added {len(transaction_ids)} to database"""})
+    return jsonify({"message": f"""Added transactions:{len(transaction_ids)} to database"""})
+
+@app.route('/api/remove-duplicates', methods=['DELETE'])
+def remove_duplicates():
+    """
+    Remove duplicate transactions by iterating rows and using a dictionary.
+    """
+    try:
+        # Dictionary to store seen keys (e.g., a combination of transaction_date, amount, and description)
+        seen = {}
+
+        # Query all transactions ordered by id
+        transactions = Transaction.query.order_by(Transaction.transaction_id).all()
+
+        duplicates = []
+        for transaction in transactions:
+            # Create a unique key for each transaction
+            key = transaction.key
+
+            if key in seen:
+                # If the key is already seen, mark for deletion
+                duplicates.append(transaction.transaction_id)
+            else:
+                # Otherwise, store it in the dictionary
+                seen[key] = transaction.transaction_id
+
+        # Bulk delete duplicate transactions
+        if duplicates:
+            Transaction.query.filter(Transaction.transaction_id.in_(duplicates)).delete(synchronize_session=False)
+            db.session.commit()
+
+        return jsonify({
+            "message": f"Removed {len(duplicates)} duplicate transactions."
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 def add_trasactions_to_db(transactions, account_id):
     transaction_ids = []
@@ -246,6 +269,22 @@ def add_trasactions_to_db(transactions, account_id):
 
         try:
             transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d')
+            temp_transaction = Transaction(
+                account_id=account_id,
+                transaction_date=transaction_date,
+                description=description,
+                category=category,
+                amount=amount
+            )
+
+            # Check if a transaction with the same key exists
+            existing_transaction = Transaction.get_by_key(temp_transaction.key)
+
+            # If exisitng transaction avoid insert into db
+            if existing_transaction:
+                print(f"Duplicate transaction detected, skipping: {temp_transaction.key}")
+                continue
+
             new_transaction = Transaction.add_transaction(
                 account_id=account_id,
                 transaction_date=transaction_date,
@@ -261,30 +300,7 @@ def add_trasactions_to_db(transactions, account_id):
             print(f"Failed to add transaction for {transaction}: {e}")
     return transaction_ids
 
-    # converter = DocumentConverter()
-    # result = converter.convert(file_path)
-    # df = list()
-    # for _, table in enumerate(result.document.tables):
-    #     table_df = table.export_to_dataframe()
-    #     if is_valid_transactions_table(table_df):
-    #         df.append(table_df)
-    # print(df)
-    # return jsonify({"message": transactions})
 
-    # try:
-    #     # Extract text from the PDF
-    #     reader = PdfReader(file_path)
-    #     text = ""
-    #     for page in reader.pages:
-    #         text += page.extract_text() + "\n"
-
-    #     # Delete the file after processing
-    #     os.remove(file_path)
-
-    #     return jsonify({"message": "PDF processed successfully.", "text": text})
-    # except Exception as e:
-    #     return jsonify({"error": f"An error occurred while reading the PDF: {str(e)}"}), 500
-    
 def get_all_accounts_from_db():
     with app.app_context():
         accounts = Account.query.all()
