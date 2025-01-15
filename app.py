@@ -123,7 +123,7 @@ def get_transactions():
             account = transaction.account  # Access the account using the relationship
             result.append({
                 "transaction_id": transaction.transaction_id,
-                "transaction_date": transaction.transaction_date.isoformat(),
+                "transaction_date": transaction.transaction_date.strftime('%Y-%m-%d'),
                 "description": transaction.description,
                 "category": transaction.category,
                 "amount": transaction.amount,
@@ -214,23 +214,23 @@ def upload_pdf():
     if not API_KEY:
         raise ValueError("Please set ANTHROPIC_API_KEY environment variable")
     
-    # transactions = extract_transactions_from_pdf(file_path, API_KEY)
-    # transaction_ids = add_trasactions_to_db(transactions, account_id)
-    transactions = [
-        {
-            "transaction_date": "2024-11-28",
-            "description": "AUTOMATIC PAYMENT - THANK YOU",
-            "amount": -295.42,
-            "category": "credit card payment"
-        },
-        {
-            "transaction_date": "2024-11-02",
-            "description": "PATEL BROTHERS PINEVILLE PINEVILLE NC",
-            "amount": 6.45,
-            "category": "groceries"
-        }
-    ]
+    transactions = extract_transactions_from_pdf(file_path, API_KEY)
     transaction_ids = add_trasactions_to_db(transactions, account_id)
+    # transactions = [
+    #     {
+    #         "transaction_date": "2024-11-28",
+    #         "description": "AUTOMATIC PAYMENT - THANK YOU",
+    #         "amount": -295.42,
+    #         "category": "credit card payment"
+    #     },
+    #     {
+    #         "transaction_date": "2024-11-02",
+    #         "description": "PATEL BROTHERS PINEVILLE PINEVILLE NC",
+    #         "amount": 6.45,
+    #         "category": "groceries"
+    #     }
+    # ]
+    # transaction_ids = add_trasactions_to_db(transactions, account_id)
     os.remove(file_path)
     return jsonify({"message": f"""Added {len(transaction_ids)} to database"""})
 

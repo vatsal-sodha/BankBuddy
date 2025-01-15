@@ -29,6 +29,14 @@ const TransactionsTab = () => {
         message: '',
         severity: 'success'
     });
+    // Categories for dropdown
+    const categories = [
+        'paycheck', 'other income', 'transfer', 'credit card payment',
+        'home', 'utilities', 'auto', 'gas', 'parking', 'travel',
+        'restaurant', 'groceries', 'medical', 'amazon', 'walmart',
+        'shopping', 'subscriptions', 'donations', 'insurance',
+        'investments', 'other expenses'
+    ];
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -81,17 +89,42 @@ const TransactionsTab = () => {
 
     // AG Grid column definitions
     const [columnDefs] = useState([
-        { field: 'transaction_date', headerName: 'Date', filter: true },
-        { field: 'description', headerName: 'Description', filter: true },
-        { field: 'amount', headerName: 'Amount', filter: true },
-        { field: 'category', headerName: 'Category', filter: true },
+        { field: 'transaction_date', headerName: 'Date', filter: true, cellEditor: "agDateStringCellEditor", editable: true },
+        { field: 'description', headerName: 'Description', filter: true, flex: 2, editable: true },
+        {
+            field: 'amount', headerName: 'Amount', filter: true,
+            cellStyle: params => {
+                return {
+                    color: params.value < 0 ? 'green' : 'black',
+                    fontWeight: '300'
+                };
+            },
+            valueFormatter: params => {
+                const value = params.value;
+                const formattedValue = Math.abs(value).toLocaleString('en-US', {
+                    style: 'currency',
+                    currency: 'USD'
+                });
+                return value < 0 ? `-${formattedValue}` : formattedValue;
+            }
+        },
+        {
+            field: 'category', headerName: 'Category', filter: true,
+            editable: true,
+            pivot: true,
+            cellEditor: 'agSelectCellEditor',
+            cellEditorParams: {
+                values: categories
+            }
+        },
         { field: 'account_name', headerName: 'Account Name', filter: true },
         { field: 'account_institution', headerName: 'Institution', filter: true },
         { field: 'last_4_digits', headerName: 'Last 4 Digits', filter: true },
         { field: 'account_type', headerName: 'Account Type', filter: true },
+        { field: 'comment', headerName: 'Comment', filter: true, editable: true },
     ]);
     return (
-        <Paper sx={{}}>
+        <Paper sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
             <Box>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
@@ -102,10 +135,9 @@ const TransactionsTab = () => {
                     <DatePicker
                         sx={{ ml: 2 }}
                         label="To Date"
-                        value={toDate}
+                        value={fromDate}
                         minDate={fromDate}
                         onChange={setToDate}
-                        defaultValue={fromDate}
                     />
                 </LocalizationProvider>
                 <Button
@@ -130,19 +162,26 @@ const TransactionsTab = () => {
                 />
             </Box>
 
-            <div className="ag-theme-material" style={{ height: 400, width: '100%', marginTop: 5 }}>
-                <AgGridReact
-                    rowData={rowData}
-                    columnDefs={columnDefs}
-                    defaultColDef={{
-                        flex: 1,
-                        minWidth: 100,
-                        filter: true,
-                        sortable: true,
-                    }}
-                />
+            <Box sx={{ flex: 1, p: 2 }}>
+                <div className="ag-theme-material" style={{ height: '100%', width: '100%' }}>
+                    <AgGridReact
+                        rowData={rowData}
+                        columnDefs={columnDefs}
+                        pagination={true}
+                        // pivotMode={true}
+                        // sideBar={"columns"}
+                        paginationPageSize={20}
+                        paginationPageSizeSelector={[20, 50, 100]}
+                        defaultColDef={{
+                            flex: 1,
+                            minWidth: 100,
+                            filter: true,
+                            sortable: true,
+                        }}
+                    />
 
-            </div>
+                </div>
+            </Box>
             <Toast
                 open={toast.open}
                 message={toast.message}
