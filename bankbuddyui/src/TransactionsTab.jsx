@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Paper, Box, Button } from '@mui/material';
+import { Paper, Box, Button, Typography, Grid2 } from '@mui/material';
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -18,6 +18,13 @@ const TransactionsTab = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [rowData, setRowData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [summary, setSummary] = useState({
+        total_income: 0,
+        total_expense: 0,
+        refunds: 0,
+        credit_card_expense: 0,
+        net_position: 0
+    });
     const handleToastClose = (event, reason) => {
         if (reason === 'clickaway') {
             return;
@@ -38,18 +45,31 @@ const TransactionsTab = () => {
         'investments', 'other expenses'
     ];
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const fetchFinancialSummary = async () => {
+        if (!fromDate || !toDate) return;
 
-        if (!fromDate || !toDate) {
+        try {
+            const response = await fetch(
+                `http://127.0.0.1:5000/api/financial-summary?fromDate=${fromDate.format('YYYY-MM-DD')}&toDate=${toDate.format('YYYY-MM-DD')}`
+            );
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch financial summary');
+            }
+
+            const data = await response.json();
+            setSummary(data);
+        } catch (error) {
             setToast({
                 open: true,
-                message: "Please select both fromDate and a toDate",
-                severity: 'warning'
+                message: error.message,
+                severity: 'error'
             });
-            return;
         }
-        setIsLoading(true);
+    };
+
+    const fetchTransactions = async () => {
+        if (!fromDate || !toDate) return;
         try {
             const response = await fetch(
                 `http://127.0.0.1:5000/api/get-transactions?fromDate=${fromDate.format('YYYY-MM-DD')}&toDate=${toDate.format('YYYY-MM-DD')}`
@@ -68,6 +88,34 @@ const TransactionsTab = () => {
                 message: "Transactions retrieved successfully!",
                 severity: 'success'
             });
+
+        } catch (error) {
+            setToast({
+                open: true,
+                message: error.message,
+                severity: 'error'
+            });
+        }
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!fromDate || !toDate) {
+            setToast({
+                open: true,
+                message: "Please select both fromDate and a toDate",
+                severity: 'warning'
+            });
+            return;
+        }
+        setIsLoading(true);
+        try {
+            await Promise.all([
+                fetchTransactions(),
+                fetchFinancialSummary()
+            ]);
+
         } catch (error) {
             setToast({
                 open: true,
@@ -86,6 +134,14 @@ const TransactionsTab = () => {
     const handleClose = () => {
         setOpenDialog(false);
     };
+
+    const formatCurrency = (amount) => {
+        return amount.toLocaleString('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        });
+    };
+
 
     // AG Grid column definitions
     const [columnDefs] = useState([
@@ -106,7 +162,7 @@ const TransactionsTab = () => {
                     currency: 'USD'
                 });
                 return value < 0 ? `-${formattedValue}` : formattedValue;
-            }
+            },
         },
         {
             field: 'category', headerName: 'Category', filter: true,
@@ -123,6 +179,7 @@ const TransactionsTab = () => {
         { field: 'account_type', headerName: 'Account Type', filter: true },
         { field: 'comment', headerName: 'Comment', filter: true, editable: true },
     ]);
+
     return (
         <Paper sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
             <Box>
@@ -160,6 +217,49 @@ const TransactionsTab = () => {
                     open={openDialog}
                     onClose={handleClose}
                 />
+            </Box>
+
+            <Box sx={{ p: 2, bgcolor: '#f5f5f5' }}>
+                <Grid2 container spacing={2}>
+                    <Grid2 item xs={12}>
+                        <Typography variant="h6" gutterBottom>
+                            Financial Summary
+                        </Typography>
+                    </Grid2>
+                    <Grid2 item xs={12} md={2}>
+                        <Typography variant="subtitle2">Total Income</Typography>
+                        <Typography variant="body1" color="success.main">
+                            {formatCurrency(summary.total_income)}
+                        </Typography>
+                    </Grid2>
+                    <Grid2 item xs={12} md={2}>
+                        <Typography variant="subtitle2">Total Expense</Typography>
+                        <Typography variant="body1" color="error.main">
+                            {formatCurrency(summary.total_expense)}
+                        </Typography>
+                    </Grid2>
+                    <Grid2 item xs={12} md={2}>
+                        <Typography variant="subtitle2">Refunds</Typography>
+                        <Typography variant="body1" color="success.main">
+                            {formatCurrency(summary.refunds)}
+                        </Typography>
+                    </Grid2>
+                    <Grid2 item xs={12} md={2}>
+                        <Typography variant="subtitle2">Credit Card Expense</Typography>
+                        <Typography variant="body1" color="error.main">
+                            {formatCurrency(summary.credit_card_expense)}
+                        </Typography>
+                    </Grid2>
+                    <Grid2 item xs={12} md={2}>
+                        <Typography variant="subtitle2">Net Position</Typography>
+                        <Typography
+                            variant="body1"
+                            color={summary.net_position >= 0 ? "success.main" : "error.main"}
+                        >
+                            {formatCurrency(summary.net_position)}
+                        </Typography>
+                    </Grid2>
+                </Grid2>
             </Box>
 
             <Box sx={{ flex: 1, p: 2 }}>

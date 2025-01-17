@@ -3,9 +3,6 @@ from anthropic import Anthropic
 from flask import Flask, json, request, jsonify
 from flask_cors import CORS
 import os
-from sqlalchemy import UniqueConstraint
-# from docling.document_converter import DocumentConverter
-# import pandas as pd
 import pdfplumber
 from app_utils import *
 from flask_sqlalchemy import SQLAlchemy
@@ -146,7 +143,55 @@ def get_transactions():
         return jsonify({"error": "An error occurred.", "details": str(e)}), 500
 
 
-    
+@app.route('/api/financial-summary', methods=['GET'])
+def get_financial_summary():
+    try:
+        from_date_str = request.args.get('fromDate')
+        to_date_str = request.args.get('toDate')
+
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+
+        if from_date > to_date:
+            return jsonify({"error": "fromDate cannot be after toDate."}), 400
+
+        # Get all transactions in date range
+        transactions = Transaction.get_transactions_in_date_range(from_date, to_date)
+        
+        total_income = 0
+        total_expense = 0
+        refunds = 0
+        credit_card_expense = 0
+
+        for transaction in transactions:
+            account = transaction.account
+            amount = transaction.amount
+
+            if account.type.lower() == 'checking/savings':
+                if amount > 0:
+                    total_income += amount
+                else:
+                    total_expense += abs(amount)
+            elif account.type.lower() == 'credit/debit':
+                if amount > 0:
+                    credit_card_expense += amount
+                elif transaction.category != 'credit card payment':
+                    refunds += abs(amount)
+
+        summary = {
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "refunds": refunds,
+            "credit_card_expense": credit_card_expense,
+            "net_position": total_income - total_expense
+        }
+
+        return jsonify(summary)
+
+    except ValueError as ve:
+        return jsonify({"error": f"Invalid date format. {ve}"}), 400
+    except Exception as e:
+        return jsonify({"error": "An error occurred.", "details": str(e)}), 500
 
 @app.route('/api/get-all-accounts', methods=['GET'])
 def get_all_accounts():
