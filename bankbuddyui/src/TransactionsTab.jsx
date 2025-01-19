@@ -9,6 +9,9 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import UploadPDF from './UploadPdf';
 import Toast from './Toast';
+import AddIcon from '@mui/icons-material/Add';
+import AddAccountDialog from './AddAcountDialog';
+import AddTransaction from './AddTransaction';
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 
@@ -16,6 +19,7 @@ const TransactionsTab = () => {
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
     const [openDialog, setOpenDialog] = useState(false);
+    const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
     const [rowData, setRowData] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [summary, setSummary] = useState({
@@ -42,7 +46,7 @@ const TransactionsTab = () => {
         'home', 'utilities', 'rent', 'auto', 'gas', 'parking', 'travel',
         'restaurant', 'groceries', 'medical', 'amazon', 'walmart',
         'shopping', 'subscriptions', 'donations', 'insurance',
-        'investments', 'other expenses'
+        'investments', 'other expenses', 'cash'
     ];
 
     const fetchFinancialSummary = async () => {
@@ -131,7 +135,7 @@ const TransactionsTab = () => {
                 severity: 'error'
             });
             // Refresh the grid to revert changes if update failed
-            // fetchTransactions();
+            fetchTransactions();
         }
     };
 
@@ -163,6 +167,14 @@ const TransactionsTab = () => {
             setIsLoading(false);
         }
 
+    }
+
+    const handleClickTransactionOpen = () => {
+        setOpenTransactionDialog(true);
+    }
+
+    const handleClickTransactionClose = () => {
+        setOpenTransactionDialog(false);
     }
 
     const handleClickOpen = () => {
@@ -265,6 +277,14 @@ const TransactionsTab = () => {
                     {isLoading ? "Loading..." : "Generate Report"}
                 </Button>
                 <Button
+                    sx={{ float: "right", ml: 2 }}
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleClickTransactionOpen}
+                >
+                    Add Transaction
+                </Button>
+                <Button
                     sx={{ float: "right" }}
                     variant="contained"
                     startIcon={<CloudUploadIcon />}
@@ -342,6 +362,11 @@ const TransactionsTab = () => {
 
                 </div>
             </Box>
+            <AddTransaction
+                open={openTransactionDialog}
+                onClose={handleClickTransactionClose}
+                categories={categories}
+            />
             <Toast
                 open={toast.open}
                 message={toast.message}

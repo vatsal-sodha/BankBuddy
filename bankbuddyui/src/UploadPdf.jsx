@@ -12,7 +12,8 @@ import {
     Select,
     MenuItem,
     Box,
-} from '@mui/material'; import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+} from '@mui/material';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import Toast from './Toast';
 
 const UploadPDF = ({ open, onClose }) => {
@@ -177,30 +178,6 @@ const UploadPDF = ({ open, onClose }) => {
         </Box>
 
     );
-
-    // return (
-    //     <div style={{ padding: "20px", maxWidth: "600px", margin: "auto" }}>
-    //         <h1>Upload PDF</h1>
-    //         <Button
-    //         component="label"
-    //         role={undefined}
-    //         variant="contained"
-    //         tabIndex={-1}
-    //         startIcon={<CloudUploadIcon />}
-    //         onchange={handleFileChange}
-    //         >
-    //         <input type="file" accept="application/pdf" onChange={handleFileChange} hidden/> 
-    //         Choose files
-    //         </Button>
-    //         <Typography variant="body2">
-    //         {file && <span>{file.name}</span>}</Typography>
-    //         <br/>
-    //         <Button variant="contained" onClick={handleUpload} style={{ margin: "20px" }}>Upload</Button>
-    //         <div style={{ marginTop: "20px" }}>
-    //             <strong>Response:</strong> <p>{response}</p>
-    //         </div>
-    //     </div>
-    // );
 };
 
 export default UploadPDF;

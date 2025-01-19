@@ -311,6 +311,38 @@ def upload_pdf():
     os.remove(file_path)
     return jsonify({"message": f"""Added transactions:{len(transaction_ids)} to database"""})
 
+@app.route('/api/add-transaction', methods=['POST'])
+def add_transaction():
+    try:
+        # Parse JSON payload
+        data = request.json
+
+        # Required fields
+        required_fields = ['account_id', 'transaction_date', 'description', 'category', 'amount']
+
+        # Validate that all required fields are present
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Validate date format
+        try:
+            transaction_date = datetime.strptime(data['transaction_date'], '%Y-%m-%dT%H:%M:%S.%fZ')
+        except ValueError:
+            return jsonify({'error': 'Invalid transaction_date format. Expected ISO format.'}), 400
+
+        # Validate amount is positive
+        if float(data['amount']) <= 0:
+            return jsonify({'error': 'Amount must be a positive number.'}), 400
+        
+        Transaction.add_transaction(data['account_id'], 
+                                    transaction_date, 
+                                    data['description'],
+                                    data['category'],
+                                    float(data['amount']))
+        return jsonify({'message': 'Transaction added successfully!'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/remove-duplicates', methods=['DELETE'])
 def remove_duplicates():
     """
