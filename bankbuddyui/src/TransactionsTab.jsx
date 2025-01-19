@@ -97,6 +97,43 @@ const TransactionsTab = () => {
             });
         }
     }
+    const onCellValueChanged = async (params) => {
+        const { data, colDef, newValue } = params;
+        const fieldName = colDef.field;
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/update-transaction', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    transaction_id: data.transaction_id,
+                    field: fieldName,
+                    value: newValue
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update transaction');
+            }
+
+            setToast({
+                open: true,
+                message: 'Transaction updated successfully!',
+                severity: 'success'
+            });
+
+        } catch (error) {
+            setToast({
+                open: true,
+                message: error.message,
+                severity: 'error'
+            });
+            // Refresh the grid to revert changes if update failed
+            // fetchTransactions();
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -145,10 +182,26 @@ const TransactionsTab = () => {
 
     // AG Grid column definitions
     const [columnDefs] = useState([
-        { field: 'transaction_date', headerName: 'Date', filter: true, cellEditor: "agDateStringCellEditor", editable: true },
+        {
+            field: 'transaction_date',
+            headerName: 'Date',
+            filter: true,
+            editable: true,
+            cellEditor: 'agDateStringCellEditor',
+            valueFormatter: params => {
+                if (!params.value) return '';
+                return new Date(params.value).toISOString().split('T')[0];
+            },
+            valueSetter: params => {
+                const newDate = params.newValue;
+                if (!newDate) return false;
+                params.data.transaction_date = new Date(newDate).toISOString().split('T')[0];
+                return true;
+            }
+        },
         { field: 'description', headerName: 'Description', filter: true, flex: 2, editable: true },
         {
-            field: 'amount', headerName: 'Amount', filter: true,
+            field: 'amount', headerName: 'Amount', filter: true, editable: true,
             cellStyle: params => {
                 return {
                     color: params.value < 0 ? 'green' : 'black',
@@ -163,6 +216,12 @@ const TransactionsTab = () => {
                 });
                 return value < 0 ? `-${formattedValue}` : formattedValue;
             },
+            valueSetter: params => {
+                const newValue = parseFloat(params.newValue);
+                if (isNaN(newValue)) return false;
+                params.data.amount = newValue;
+                return true;
+            }
         },
         {
             field: 'category', headerName: 'Category', filter: true,
@@ -278,6 +337,7 @@ const TransactionsTab = () => {
                             filter: true,
                             sortable: true,
                         }}
+                        onCellValueChanged={onCellValueChanged}
                     />
 
                 </div>

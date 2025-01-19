@@ -232,7 +232,55 @@ def create_account():
             'message': str(e)
         }), 500
 
-        
+@app.route('/api/update-transaction', methods=['PUT'])
+def update_transaction():
+    try:
+        data = request.json
+        transaction_id = data.get('transaction_id')
+        field = data.get('field')
+        value = data.get('value')
+
+        if not all([transaction_id, field]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        if value is None:
+            return jsonify({"error": "Missing required fields"}), 400
+
+
+        # Get the transaction
+        transaction = Transaction.query.get(transaction_id)
+        if not transaction:
+            return jsonify({"error": "Transaction not found"}), 404
+
+        # Update the appropriate field
+        if field == 'transaction_date':
+            try:
+                transaction.transaction_date = datetime.strptime(value, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": "Invalid date format"}), 400
+        elif field == 'amount':
+            try:
+                transaction.amount = float(value)
+            except ValueError:
+                return jsonify({"error": "Invalid amount"}), 400
+        elif field == 'description':
+            transaction.description = value
+        elif field == 'category':
+            transaction.category = value
+        elif field == 'comment':
+            transaction.comment = value
+        else:
+            return jsonify({"error": "Invalid field"}), 400
+
+        # Save the changes
+        db.session.commit()
+
+        return jsonify({"message": "Transaction updated successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
 @app.route('/api/upload-statement', methods=['POST'])
 def upload_pdf():
     # Get the account_id from the form data
