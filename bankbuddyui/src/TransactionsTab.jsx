@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Paper, Box, Button, Typography, Grid2 } from '@mui/material';
+import React, { useState, useMemo } from 'react';
+import { Paper, Box, Button, Typography, Grid2, CircularProgress } from '@mui/material';
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -21,6 +21,7 @@ const TransactionsTab = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
     const [rowData, setRowData] = useState([]);
+    const [selectedTransactionIds, setSelectedTransactionIds] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [summary, setSummary] = useState({
         total_income: 0,
@@ -101,6 +102,50 @@ const TransactionsTab = () => {
             });
         }
     }
+
+    // Handle delete transactions
+    const handleDeleteTransactions = async () => {
+        if (selectedTransactionIds.length === 0) return;
+
+        setIsLoading(true);
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/api/delete-transaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ transaction_ids: selectedTransactionIds }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || 'Failed to delete transactions');
+            }
+
+            setToast({
+                open: true,
+                message: `Successfully deleted ${selectedTransactionIds.length} transaction(s).`,
+                severity: 'success',
+            });
+
+            // Optionally, refresh the grid data after deletion
+            const newRowData = rowData.filter(
+                row => !selectedTransactionIds.includes(row.transaction_id)
+            );
+            setRowData(newRowData);
+
+        } catch (error) {
+            setToast({
+                open: true,
+                message: error.message,
+                severity: 'error',
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
     const onCellValueChanged = async (params) => {
         const { data, colDef, newValue } = params;
         const fieldName = colDef.field;
@@ -191,6 +236,18 @@ const TransactionsTab = () => {
         });
     };
 
+    const rowSelection = useMemo(() => {
+        return {
+            mode: "multiRow",
+        };
+    }, []);
+
+    // AG Grid Selection Changed Event
+    const onSelectionChanged = (event) => {
+        const selectedRows = event.api.getSelectedRows();
+        const selectedIds = selectedRows.map(row => row.transaction_id);
+        setSelectedTransactionIds(selectedIds);
+    };
 
     // AG Grid column definitions
     const [columnDefs] = useState([
@@ -285,6 +342,16 @@ const TransactionsTab = () => {
                     Add Transaction
                 </Button>
                 <Button
+                    sx={{ ml: 2 }}
+                    onClick={handleDeleteTransactions}
+                    variant="contained"
+                    color="error"
+                    disabled={selectedTransactionIds.length === 0 || isLoading}
+                    startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
+                >
+                    {isLoading ? 'Deleting...' : selectedTransactionIds.length > 1 ? 'Delete Transactions' : 'Delete Transaction'}
+                </Button>
+                <Button
                     sx={{ float: "right" }}
                     variant="contained"
                     startIcon={<CloudUploadIcon />}
@@ -351,6 +418,8 @@ const TransactionsTab = () => {
                         // sideBar={"columns"}
                         paginationPageSize={20}
                         paginationPageSizeSelector={[20, 50, 100]}
+                        rowSelection={rowSelection}
+                        onSelectionChanged={onSelectionChanged}
                         defaultColDef={{
                             flex: 1,
                             minWidth: 100,

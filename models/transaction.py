@@ -45,6 +45,21 @@ class Transaction(db.Model):
         return new_transaction  # Return the created transaction
     
     @classmethod
+    def delete_transaction(cls, transaction_id):
+        """
+        Deletes a transaction by its ID.
+        
+        :param transaction_id: ID of the transaction to delete.
+        :return: True if the transaction was deleted, False if not found.
+        """
+        transaction = cls.query.get(transaction_id)
+        if transaction:
+            db.session.delete(transaction)
+            db.session.commit()
+            return True
+        return False
+    
+    @classmethod
     def get_transactions_in_date_range(cls, from_date, to_date):
         """
         Retrieve all transactions between from_date and to_date

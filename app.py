@@ -331,7 +331,7 @@ def add_transaction():
             return jsonify({'error': 'Invalid transaction_date format. Expected ISO format.'}), 400
 
         # Validate amount is positive
-        if float(data['amount']) <= 0:
+        if float(data['amount']) < 0:
             return jsonify({'error': 'Amount must be a positive number.'}), 400
         
         Transaction.add_transaction(data['account_id'], 
@@ -342,6 +342,59 @@ def add_transaction():
         return jsonify({'message': 'Transaction added successfully!'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+
+@app.route('/api/delete-transaction', methods=['POST'])
+def delete_transactions():
+    """
+    Endpoint to delete multiple transactions by their IDs, sent in the request body.
+    
+    :return: JSON response with success status and a message.
+    """
+    try:
+        # Get the JSON data from the request
+        data = request.get_json()
+
+        # Check if 'transaction_ids' is in the request body
+        if 'transaction_ids' not in data:
+            return jsonify({
+                "success": False,
+                "message": "'transaction_ids' is required."
+            }), 400
+
+        transaction_ids = data['transaction_ids']
+        
+        if not isinstance(transaction_ids, list):
+            return jsonify({
+                "success": False,
+                "message": "'transaction_ids' should be a list."
+            }), 400
+
+        # Track deleted and not found transactions
+        deleted = []
+        not_found = []
+
+        # Attempt to delete each transaction
+        for transaction_id in transaction_ids:
+            if Transaction.delete_transaction(transaction_id):
+                deleted.append(transaction_id)
+            else:
+                not_found.append(transaction_id)
+        
+        if len(deleted) == len(transaction_ids):
+            return jsonify({"message": f"""Deleted transactions:{len(transaction_ids)} from the database"""}), 200
+        
+        return jsonify({"error": f""""Delted {len(deleted)}/{len(transaction_ids)} transactions"""}), 500
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"An error occurred: {str(e)}"
+        }), 500
+
+
+
+
 
 @app.route('/api/remove-duplicates', methods=['DELETE'])
 def remove_duplicates():

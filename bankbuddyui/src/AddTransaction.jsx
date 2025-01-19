@@ -18,7 +18,6 @@ import dayjs from 'dayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import Toast from './Toast';
 
 const AddTransaction = ({ open, onClose, categories }) => {
@@ -26,7 +25,7 @@ const AddTransaction = ({ open, onClose, categories }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         account_id: '',
-        transaction_date: null,
+        transaction_date: dayjs(), // Set default to today's date
         description: '',
         category: '',
         amount: ''
