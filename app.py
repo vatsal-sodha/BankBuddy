@@ -162,10 +162,14 @@ def get_transactions_by_categories():
         for transaction in transactions:
             if transaction.category == 'credit card payment' and transaction.account.type != 'checking/savings':
                 continue
+            amount = transaction.amount
+            if transaction.account.type == 'credit/debit':
+                amount = -amount
             if transaction.category not in transaction_categories:
-                transaction_categories[transaction.category] = transaction.amount
+                transaction_categories[transaction.category] = amount
             else:
-                transaction_categories[transaction.category] += transaction.amount
+
+                transaction_categories[transaction.category] += amount
         
         return jsonify({"transactions": transaction_categories})
 

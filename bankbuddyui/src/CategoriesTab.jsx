@@ -87,7 +87,7 @@ const CategoriesTab = () => {
             flex: 1,
             cellStyle: params => {
                 return {
-                    color: params.value < 0 ? 'green' : 'black',
+                    color: params.value < 0 ? 'red' : 'black',
                     fontWeight: '300'
                 };
             },
