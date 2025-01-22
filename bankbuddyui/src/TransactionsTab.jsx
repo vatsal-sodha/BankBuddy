@@ -10,7 +10,6 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import UploadPDF from './UploadPdf';
 import Toast from './Toast';
 import AddIcon from '@mui/icons-material/Add';
-import AddAccountDialog from './AddAcountDialog';
 import AddTransaction from './AddTransaction';
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -445,8 +444,6 @@ const TransactionsTab = () => {
                         rowData={rowData}
                         columnDefs={columnDefs}
                         pagination={true}
-                        // pivotMode={true}
-                        // sideBar={"columns"}
                         paginationPageSize={20}
                         paginationPageSizeSelector={[20, 50, 100]}
                         rowSelection={rowSelection}

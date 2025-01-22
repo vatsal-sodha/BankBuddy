@@ -142,6 +142,37 @@ def get_transactions():
         # Handle unexpected errors
         return jsonify({"error": "An error occurred.", "details": str(e)}), 500
 
+@app.route('/api/transactions-by-categories', methods=['GET'])
+def get_transactions_by_categories():
+    try:
+        from_date_str = request.args.get('fromDate')
+        to_date_str = request.args.get('toDate')
+
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+
+        if from_date > to_date:
+            return jsonify({"error": "fromDate cannot be after toDate."}), 400
+        
+         # Get all transactions in date range
+        transactions = Transaction.get_transactions_in_date_range(from_date, to_date)
+
+        transaction_categories = {}
+
+        for transaction in transactions:
+            if transaction.category == 'credit card payment' and transaction.account.type != 'checking/savings':
+                continue
+            if transaction.category not in transaction_categories:
+                transaction_categories[transaction.category] = transaction.amount
+            else:
+                transaction_categories[transaction.category] += transaction.amount
+        
+        return jsonify({"transactions": transaction_categories})
+
+    except ValueError as ve:
+        return jsonify({"error": f"Invalid date format. {ve}"}), 400
+    except Exception as e:
+        return jsonify({"error": "An error occurred.", "details": str(e)}), 500 
 
 @app.route('/api/financial-summary', methods=['GET'])
 def get_financial_summary():
