@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Paper, Box, Button, Typography, Grid2, CircularProgress } from '@mui/material';
+import { Paper, Box, Button, Typography, Grid2, CircularProgress, Dialog, DialogContent, DialogTitle, DialogActions } from '@mui/material';
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -23,6 +23,7 @@ const TransactionsTab = () => {
     const [rowData, setRowData] = useState([]);
     const [selectedTransactionIds, setSelectedTransactionIds] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [deleteDialog, setDeleteDialog] = useState(false);
     const [summary, setSummary] = useState({
         total_income: 0,
         total_expense: 0,
@@ -229,6 +230,13 @@ const TransactionsTab = () => {
         setOpenDialog(false);
     };
 
+    const handleDeleteDialogOpen = () => {
+        setDeleteDialog(true);
+    };
+    const handleDeleteDialogClose = () => {
+        setDeleteDialog(false);
+    };
+
     const formatCurrency = (amount) => {
         return amount.toLocaleString('en-US', {
             style: 'currency',
@@ -343,7 +351,7 @@ const TransactionsTab = () => {
                 </Button>
                 <Button
                     sx={{ ml: 2 }}
-                    onClick={handleDeleteTransactions}
+                    onClick={handleDeleteDialogOpen}
                     variant="contained"
                     color="error"
                     disabled={selectedTransactionIds.length === 0 || isLoading}
@@ -364,6 +372,29 @@ const TransactionsTab = () => {
                     onClose={handleClose}
                 />
             </Box>
+            <Dialog
+                open={deleteDialog}
+                onClose={handleDeleteDialogClose}
+            >
+                <DialogTitle>Confirm Delete</DialogTitle>
+                <DialogContent>
+                    Are you sure you want to delete selected transactions? This action cannot be undone.
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleDeleteDialogClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteTransactions}
+                        color="error"
+                        variant="contained"
+                        disabled={selectedTransactionIds.length === 0 || isLoading}
+                        startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
+                    >
+                        {isLoading ? 'Deleting...' : selectedTransactionIds.length > 1 ? 'Delete Transactions' : 'Delete Transaction'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Box sx={{ p: 2, bgcolor: '#f5f5f5' }}>
                 <Grid2 container spacing={2}>

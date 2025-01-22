@@ -1,5 +1,7 @@
 import datetime
 from . import db
+from sqlalchemy import func
+
 
 # Transaction Table Schema
 class Transaction(db.Model):
@@ -68,7 +70,7 @@ class Transaction(db.Model):
         :param to_date: End date as a datetime object.
         :return: List of transactions within the date range.
         """
-        query = cls.query.filter(cls.transaction_date >= from_date, cls.transaction_date <= to_date)
+        query = cls.query.filter(func.date(cls.transaction_date).between(from_date, to_date))
 
         return query.all()
     
