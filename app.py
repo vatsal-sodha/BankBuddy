@@ -400,7 +400,7 @@ def edit_account(account_id):
         data = request.json
         
         # Update account fields
-        account.name = data.get('name', account.name)
+        account.name = data.get('account_name', account.name)
         account.institution = data.get('institution', account.institution)
         account.type = data.get('type', account.type)
         account.last_4_digits = data.get('last_4_digits', account.last_4_digits)

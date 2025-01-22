@@ -6,23 +6,26 @@ import {
     DialogActions,
     Button,
     TextField,
-    Grid
+    FormControl,
+    Select,
+    MenuItem,
+    InputLabel
 } from '@mui/material';
 
 const EditAccountDialog = ({ open, account, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
-        name: '',
+        account_name: '',
         institution: '',
-        type: '',
+        account_type: '',
         last_4_digits: ''
     });
 
     useEffect(() => {
         if (account) {
             setFormData({
-                name: account.name,
+                account_name: account.name,
                 institution: account.institution || '',
-                type: account.type,
+                account_type: account.type,
                 last_4_digits: account.last_4_digits
             });
         }
@@ -45,18 +48,69 @@ const EditAccountDialog = ({ open, account, onClose, onSubmit }) => {
             <form onSubmit={handleSubmit}>
                 <DialogTitle>Edit Account</DialogTitle>
                 <DialogContent>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                        <Grid item xs={12}>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        name="account_name"
+                        label="Account Name"
+                        type="text"
+                        fullWidth
+                        value={formData.account_name}
+                        onChange={handleChange}
+                        required
+                        sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        margin="dense"
+                        name="institution"
+                        label="Institution"
+                        type="text"
+                        fullWidth
+                        value={formData.institution}
+                        onChange={handleChange}
+                        required
+                        sx={{ mb: 2 }}
+                    />
+                    <FormControl fullWidth required sx={{ mb: 2 }}>
+                        <InputLabel>Account Type</InputLabel>
+                        <Select
+                            name="account_type"
+                            value={formData.account_type}
+                            label="Account Type"
+                            onChange={handleChange}
+                        >
+                            <MenuItem value="credit/debit">Credit/Debit Card</MenuItem>
+                            <MenuItem value="checking/savings">Checking/Savings Account</MenuItem>
+                            <MenuItem value="other">Other</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <TextField
+                        margin="dense"
+                        name="last_4_digits"
+                        label="Last 4 Digits"
+                        type="text"
+                        fullWidth
+                        value={formData.last_4_digits}
+                        onChange={handleChange}
+                        required
+                        inputProps={{
+                            maxLength: 4,
+                            pattern: "[0-9]*"
+                        }}
+                        helperText="Enter the last 4 digits of your account"
+                    />
+                    {/* <Grid2 container spacing={2} sx={{ mt: 1 }}>
+                        <Grid2 item xs={12}>
                             <TextField
                                 required
                                 fullWidth
                                 label="Account Name"
                                 name="name"
-                                value={formData.name}
+                                value={formData.account_name}
                                 onChange={handleChange}
                             />
-                        </Grid>
-                        <Grid item xs={12}>
+                        </Grid2>
+                        <Grid2 item xs={12}>
                             <TextField
                                 fullWidth
                                 label="Institution"
@@ -64,18 +118,21 @@ const EditAccountDialog = ({ open, account, onClose, onSubmit }) => {
                                 value={formData.institution}
                                 onChange={handleChange}
                             />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                required
-                                fullWidth
+                        </Grid2>
+                        <Grid2 item xs={12}>
+                            <InputLabel>Account Type</InputLabel>
+                            <Select
+                                name="account_type"
+                                value={formData.account_type}
                                 label="Account Type"
-                                name="type"
-                                value={formData.type}
                                 onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
+                            >
+                                <MenuItem value="credit/debit">Credit/Debit Card</MenuItem>
+                                <MenuItem value="checking/savings">Checking/Savings Account</MenuItem>
+                                <MenuItem value="other">Other</MenuItem>
+                            </Select>
+                        </Grid2>
+                        <Grid2 item xs={12}>
                             <TextField
                                 required
                                 fullWidth
@@ -88,8 +145,8 @@ const EditAccountDialog = ({ open, account, onClose, onSubmit }) => {
                                     pattern: '[0-9]{4}'
                                 }}
                             />
-                        </Grid>
-                    </Grid>
+                        </Grid2>
+                    </Grid2> */}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={onClose}>Cancel</Button>
