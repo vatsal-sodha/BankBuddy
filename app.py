@@ -393,7 +393,39 @@ def delete_transactions():
         }), 500
 
 
+@app.route('/api/edit-account/<int:account_id>', methods=['PUT'])
+def edit_account(account_id):
+    try:
+        account = Account.query.get_or_404(account_id)
+        data = request.json
+        
+        # Update account fields
+        account.name = data.get('name', account.name)
+        account.institution = data.get('institution', account.institution)
+        account.type = data.get('type', account.type)
+        account.last_4_digits = data.get('last_4_digits', account.last_4_digits)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Account updated successfully',
+            'account': account.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
 
+@app.route('/api/delete-account/<int:account_id>', methods=['DELETE'])
+def delete_account(account_id):
+    try:
+        account = Account.query.get_or_404(account_id)
+        db.session.delete(account)
+        db.session.commit()
+        
+        return jsonify({'message': 'Account deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
 
 
 @app.route('/api/remove-duplicates', methods=['DELETE'])

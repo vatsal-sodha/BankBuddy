@@ -3,11 +3,13 @@ import { Button, Box, Card, CardContent, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import AddAccountDialog from './AddAcountDialog';
 import Toast from './Toast';
-import Grid from '@mui/material/Grid2';
+import AccountsTable from './AcountsTable';
+import EditAccountDialog from './EditAccountDialog';
 
 const AccountsTab = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [accounts, setAccounts] = useState([]);
+    const [editDialog, setEditDialog] = useState({ open: false, account: null });
     const [toast, setToast] = useState({
         open: false,
         message: '',
@@ -46,11 +48,52 @@ const AccountsTab = () => {
         setOpenDialog(false);
     };
 
+    const showToast = (message, severity = 'success') => {
+        setToast({ open: true, message, severity });
+    };
+
     const handleToastClose = (event, reason) => {
         if (reason === 'clickaway') {
             return;
         }
         setToast({ ...toast, open: false });
+    };
+
+    const handleEdit = async (formData) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/edit-account/${editDialog.account.account_id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            setAccounts(accounts.map(acc =>
+                acc.account_id === editDialog.account.account_id ? data.account : acc
+            ));
+            showToast('Account updated successfully');
+            setEditDialog({ open: false, account: null });
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    };
+
+    const handleDelete = async (accountId) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/delete-account/${accountId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+
+            setAccounts(accounts.filter(acc => acc.account_id !== accountId));
+            showToast('Account deleted successfully');
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
     };
 
     const handleSubmit = async (formData) => {
@@ -112,26 +155,30 @@ const AccountsTab = () => {
                     Add Account
                 </Button>
             </Box>
-            <Grid container spacing={2}>
-                {accounts.map((account) => (
-                    <Grid item xs={12} sm={6} md={4} key={account.account_id}>
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6">{account.name}</Typography>
-                                <Typography variant="body2">
-                                    Institution: {account.institution || 'N/A'}
-                                </Typography>
-                                <Typography variant="body2">
-                                    Type: {account.type}
-                                </Typography>
-                                <Typography variant="body2">
-                                    Last 4 Digits: {account.last_4_digits}
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
+            <Box sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                    {/* <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenAddDialog(true)}
+                    >
+                        Add Account
+                    </Button> */}
+                </Box>
+
+                <AccountsTable
+                    accounts={accounts}
+                    onEdit={(account) => setEditDialog({ open: true, account })}
+                    onDelete={handleDelete}
+                />
+
+                <EditAccountDialog
+                    open={editDialog.open}
+                    account={editDialog.account}
+                    onClose={() => setEditDialog({ open: false, account: null })}
+                    onSubmit={handleEdit}
+                />
+            </Box>
             <AddAccountDialog
                 open={openDialog}
                 onClose={handleClose}
@@ -143,7 +190,6 @@ const AccountsTab = () => {
                 severity={toast.severity}
                 onClose={handleToastClose}
             />
-            {/* Add your accounts list/grid here */}
         </Box>
     );
 };
