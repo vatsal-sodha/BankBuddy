@@ -13,8 +13,8 @@ class Transaction(db.Model):
     description = db.Column(db.String(255), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     amount = db.Column(db.Float, nullable=False)
-    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
-    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)
+    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), onupdate=datetime.datetime.utcnow, nullable=False)
     comment = db.Column(db.Text, nullable=True)
 
     def __repr__(self):

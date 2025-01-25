@@ -4,9 +4,8 @@ from flask import Flask, json, request, jsonify
 from flask_cors import CORS
 import os
 import pdfplumber
-from app_utils import *
-from flask_sqlalchemy import SQLAlchemy
-from privacy_filter import PrivacyFilter
+from app.app_utils import *
+from app.privacy_filter import PrivacyFilter
 from dotenv import load_dotenv
 from models.account import Account
 from models.transaction import Transaction
@@ -15,8 +14,8 @@ load_dotenv()
 app = Flask(__name__)
 app.debug = True
 CORS(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy_copy.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db.init_app(app)
 # Create tables
 with app.app_context():
