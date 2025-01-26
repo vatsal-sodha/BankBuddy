@@ -9,16 +9,16 @@ class Transaction(db.Model):
 
     transaction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.account_id'), nullable=False)
-    transaction_date = db.Column(db.DateTime, nullable=False)
+    transaction_date = db.Column(db.Date, nullable=False)
     description = db.Column(db.String(255), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     amount = db.Column(db.Float, nullable=False)
-    created_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)
-    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), onupdate=datetime.datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)  # Renamed to created_at
+    last_modified_time = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.UTC), nullable=True)  # Renamed to last_modified_time, only updates on modification
     comment = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
-        return f"<Transaction {self.id} - {self.amount}>"
+        return f"<Transaction {self.transaction_id} - {self.amount}>"
 
     @property
     def key(self):
@@ -70,7 +70,7 @@ class Transaction(db.Model):
         :param to_date: End date as a datetime object.
         :return: List of transactions within the date range.
         """
-        query = cls.query.filter(func.date(cls.transaction_date).between(from_date, to_date))
+        query = cls.query.filter(cls.transaction_date >= from_date, cls.transaction_date <= to_date)
 
         return query.all()
     

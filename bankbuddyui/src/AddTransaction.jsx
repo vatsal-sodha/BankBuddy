@@ -71,7 +71,7 @@ const AddTransaction = ({ open, onClose, categories }) => {
                 },
                 body: JSON.stringify({
                     account_id: formData.account_id,
-                    transaction_date: formData.transaction_date ? formData.transaction_date.toISOString() : null,
+                    transaction_date: formData.transaction_date ? formData.transaction_date.format("YYYY-MM-DD") : null,
                     description: formData.description,
                     category: formData.category,
                     amount: formData.amount,

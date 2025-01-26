@@ -14,7 +14,7 @@ load_dotenv()
 app = Flask(__name__)
 app.debug = True
 CORS(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy_copy.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db.init_app(app)
 # Create tables
@@ -107,8 +107,8 @@ def get_transactions():
         from_date_str = request.args.get('fromDate')
         to_date_str = request.args.get('toDate')
 
-        from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
-        to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
 
         if from_date > to_date:
             return jsonify({"error": "fromDate cannot be after toDate."}), 400
@@ -147,8 +147,8 @@ def get_transactions_by_categories():
         from_date_str = request.args.get('fromDate')
         to_date_str = request.args.get('toDate')
 
-        from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
-        to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
 
         if from_date > to_date:
             return jsonify({"error": "fromDate cannot be after toDate."}), 400
@@ -183,8 +183,8 @@ def get_financial_summary():
         from_date_str = request.args.get('fromDate')
         to_date_str = request.args.get('toDate')
 
-        from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
-        to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
 
         if from_date > to_date:
             return jsonify({"error": "fromDate cannot be after toDate."}), 400
@@ -289,7 +289,7 @@ def update_transaction():
         # Update the appropriate field
         if field == 'transaction_date':
             try:
-                transaction.transaction_date = datetime.strptime(value, '%Y-%m-%d')
+                transaction.transaction_date = datetime.strptime(value, '%Y-%m-%d').date()
             except ValueError:
                 return jsonify({"error": "Invalid date format"}), 400
         elif field == 'amount':
@@ -360,7 +360,7 @@ def add_transaction():
 
         # Validate date format
         try:
-            transaction_date = datetime.strptime(data['transaction_date'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            transaction_date = datetime.strptime(data['transaction_date'], '%Y-%m-%d').date()
         except ValueError:
             return jsonify({'error': 'Invalid transaction_date format. Expected ISO format.'}), 400
 
@@ -512,7 +512,7 @@ def add_trasactions_to_db(transactions, account_id):
         comment = transaction.get('comment', None)
 
         try:
-            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d')
+            transaction_date = datetime.strptime(transaction_date_str, '%Y-%m-%d').date()
             temp_transaction = Transaction(
                 account_id=account_id,
                 transaction_date=transaction_date,

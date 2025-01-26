@@ -10,7 +10,7 @@ class Account(db.Model):
     name = db.Column(db.String(100), nullable=False)
     institution = db.Column(db.String(100), nullable=True)
     created_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)
-    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), onupdate=datetime.datetime.utcnow, nullable=False)
+    last_modified_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), onupdate=datetime.datetime.now(datetime.UTC), nullable=False)
     last_4_digits = db.Column(db.String(4), nullable=False)
     type = db.Column(db.String(50), nullable=False)
 

@@ -1,5 +1,4 @@
 // import './App.css';
-import UploadPDF from './UploadPdf';
 import {
     AppBar,
     Tabs,
