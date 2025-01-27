@@ -1,7 +1,5 @@
 import datetime
 from . import db
-from sqlalchemy import func
-
 
 # Transaction Table Schema
 class Transaction(db.Model):
@@ -29,6 +27,7 @@ class Transaction(db.Model):
             self.category, 
             self.account_id
         )
+    
     @classmethod
     def add_transaction(cls, account_id, transaction_date, description, category, amount, comment=None):
         new_transaction = cls(

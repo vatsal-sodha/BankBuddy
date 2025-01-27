@@ -9,17 +9,19 @@ from app.privacy_filter import PrivacyFilter
 from dotenv import load_dotenv
 from models.account import Account
 from models.transaction import Transaction
+from models.balance import Balance
 from models import db
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+
 load_dotenv()
 app = Flask(__name__)
 app.debug = True
 CORS(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bankBuddy.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+DATABASE_NAME='bankBuddy.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + DATABASE_NAME
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-# Create tables
-with app.app_context():
-    db.create_all()
 
 def extract_transactions_from_pdf(pdf_path, api_key):
     """
@@ -45,19 +47,17 @@ def extract_transactions_from_pdf(pdf_path, api_key):
         raise Exception(f"Error reading PDF: {str(e)}")
     
     # Prepare prompt for Claude
-    prompt = f"""Below is the text from a credit card statement. 
+    prompt = f"""Below is the text from a credit card statement.
     Please extract all transactions and return them as a JSON array.
     Each transaction should have these fields if available:
     - transaction_date (in YYYY-MM-DD format)
     - description
     - amount
     - category
-    
     Only return the JSON array, no other text.
-    Always format dates as YYYY-MM-DD, even if they appear differently in the statement. 
+    Always format dates as YYYY-MM-DD, even if they appear differently in the statement.
     Also if year is missing infer the year from rest of the texts and return in it YYYY-MM-DD format
-
-    - Can you please also classify the transaction based on the description of the transaction 
+    - Can you please also classify the transaction based on the description of the transaction
     among one of the categories from below:
     - paycheck, other income,
     - transfer, credit card payment
@@ -67,8 +67,9 @@ def extract_transactions_from_pdf(pdf_path, api_key):
     - amazon, walmart, shopping
     - subscriptions, donations, insurance
     - investments, other expenses
-    
     All categories above are comma separated and do return category for each transaction
+    Can you please also extract statement date in YYYY-MM-DD format and account balance as of that date and return in json format along with all transactions
+    Please return account_balance (as a string), statement_date, and transactions in JSON format
 
     Statement text:
     {text}"""
@@ -84,13 +85,13 @@ def extract_transactions_from_pdf(pdf_path, api_key):
         response = message.content[0].text
         
         # Parse JSON response
-        transactions = json.loads(response)
+        data = json.loads(response)
         
         # Basic validation
-        if not isinstance(transactions, list):
+        if not isinstance(data['transactions'], list):
             raise ValueError("Response is not a JSON array")
                     
-        return transactions
+        return data
         
     except Exception as e:
         raise Exception(f"Error processing with Claude: {str(e)}")
@@ -128,7 +129,7 @@ def get_transactions():
                 "account_institution": account.institution,
                 "last_4_digits": account.last_4_digits,
                 "account_type": account.type,
-                "account_id":account.account_id
+                "account_id": account.account_id
             })
 
         # Return the result as JSON
@@ -339,8 +340,11 @@ def upload_pdf():
     if not API_KEY:
         raise ValueError("Please set ANTHROPIC_API_KEY environment variable")
     
-    transactions = extract_transactions_from_pdf(file_path, API_KEY)
-    transaction_ids = add_trasactions_to_db(transactions, account_id)
+    data = extract_transactions_from_pdf(file_path, API_KEY)
+    if not isinstance(data, dict) or 'transactions' not in data or 'account_balance' not in data or 'statement_date' not in data:
+        raise ValueError("Invalid data format from PDF extraction")
+    transaction_ids = add_trasactions_to_db(data['transactions'], account_id)
+    _ = Balance.add_balance(account_id, data['account_balance'], data['statement_date'] )
 
     os.remove(file_path)
     return jsonify({"message": f"""Added transactions:{len(transaction_ids)} to database"""})
@@ -550,5 +554,69 @@ def get_all_accounts_from_db():
         accounts = Account.query.all()
         return [account.to_dict() for account in accounts]
 
-if __name__ == '__main__':
-    app.run(host='localhost', port=5000, debug=True)
+def backup_database():
+    """
+    Creates a backup of the SQLite database.
+    The backup is saved with a timestamp in the filename.
+    """
+    try:
+        # Define potential paths
+        parent_dir = os.getcwd()  # Current working directory
+        possible_paths = [
+            os.path.join(parent_dir, DATABASE_NAME),
+            os.path.join(parent_dir, 'instance', DATABASE_NAME)
+        ]
+
+        # Find the first valid database file path
+        src = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                src = path
+                break
+
+        # If no valid source file is found, raise an error
+        if not src:
+            raise FileNotFoundError("Database file not found in either the parent or 'instance' folder.")
+
+        # Define the backup directory
+        backup_dir = './backups'
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+
+        # Add a timestamp to the backup file name
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_path = os.path.join(backup_dir, f'bankBuddy_backup_{timestamp}.bak')
+
+        # Copy the database file to create a backup
+        with open(src, 'rb') as db_file:
+            with open(backup_path, 'wb') as backup_file:
+                backup_file.write(db_file.read())
+
+        print(f"Backup created successfully at {backup_path}")
+    except Exception as e:
+        print(f"Error during backup: {str(e)}")
+# Schedule the backup job
+scheduler = BackgroundScheduler()
+# trigger = CronTrigger(hour=2, minute=0)  # Daily at 2:00 AM
+scheduler.add_job(backup_database)
+scheduler.start()
+
+def initialize_scheduler():
+    """
+    Ensures the scheduler starts when the application is deployed.
+    """
+    if not scheduler.running:
+        scheduler.start()
+# Create tables
+with app.app_context():
+    db.create_all()
+    initialize_scheduler()
+
+# Ensure app runs only in Flask's debug mode or as a WSGI app
+if __name__ == "__main__":
+    try:
+        app.run(debug=True)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()
+# if __name__ == '__main__':
+#     app.run(host='localhost', port=5000, debug=True)
