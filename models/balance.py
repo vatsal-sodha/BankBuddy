@@ -32,5 +32,21 @@ class Balance(db.Model):
         db.session.commit()
 
         return new_balance
+    
+    @classmethod
+    def get_recent_balance(cls, account_id):
+        """
+        Get the most recent balance for a given account_id.
+        
+        Args:
+            account_id (int): The account ID to query
+            
+        Returns:
+            Balance: The most recent balance record for the account
+            None: If no balance record exists for the account
+        """
+        return cls.query.filter_by(account_id=account_id)\
+                  .order_by(cls.statement_date.desc())\
+                  .first()
 
 

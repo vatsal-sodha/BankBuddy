@@ -1,5 +1,7 @@
 import datetime
 from sqlalchemy import UniqueConstraint
+
+from models.balance import Balance
 from . import db
 
 # Account table schema
@@ -29,6 +31,7 @@ class Account(db.Model):
         return f"<Account {self.name} - {self.last_4_digits}>"
     
     def to_dict(self):
+        recent_balance = Balance.get_recent_balance(self.account_id)
         return {
             "account_id": self.account_id,
             "name": self.name,
@@ -37,6 +40,7 @@ class Account(db.Model):
             "last_modified_date": self.last_modified_date.isoformat(),
             "last_4_digits": self.last_4_digits,
             "type": self.type,
+            "balance": str(recent_balance.balance) if recent_balance else "NA",
             "last_statement_date": self.last_statement_date.strftime('%Y-%m-%d') if self.last_statement_date else "NA",
         }
     
@@ -50,3 +54,23 @@ class Account(db.Model):
         db.session.add(new_account)
         db.session.commit()
         return new_account.account_id
+    
+    @classmethod
+    def update_last_statement_date(cls, account_id):
+        # Get the account by account_id
+        account = cls.query.get(account_id)
+        
+        if account:
+            # Get the most recent balance record for this account
+            recent_balance = Balance.get_recent_balance(account_id)
+            
+            if recent_balance:
+                # Update the last_statement_date to the statement date of the most recent balance
+                account.last_statement_date = recent_balance.statement_date
+                db.session.commit()
+            else:
+                # Optionally handle the case where there is no balance
+                account.last_statement_date = None
+                db.session.commit()
+        else:
+            raise ValueError(f"Account with id {account_id} does not exist.")

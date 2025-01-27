@@ -40,17 +40,20 @@ const AccountsTable = ({ accounts, onEdit, onDelete }) => {
                             <TableCell>Name</TableCell>
                             <TableCell>Institution</TableCell>
                             <TableCell>Account Type</TableCell>
-                            <TableCell>Last 4 Digits</TableCell>
+                            <TableCell>Balance</TableCell>
+                            <TableCell>Recent Statmenet Upload Date</TableCell>
+                            {/* <TableCell>Last 4 Digits</TableCell> */}
                             {/* <TableCell align="right">Actions</TableCell> */}
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {accounts.map((account) => (
                             <TableRow key={account.account_id}>
-                                <TableCell>{account.name}</TableCell>
+                                <TableCell>{account.name} - {account.last_4_digits}</TableCell>
                                 <TableCell>{account.institution || 'N/A'}</TableCell>
                                 <TableCell>{account.type}</TableCell>
-                                <TableCell>{account.last_4_digits}</TableCell>
+                                <TableCell>{account.balance}</TableCell>
+                                <TableCell>{account.last_statement_date}</TableCell>
                                 <TableCell align="right">
                                     <IconButton
                                         color="primary"

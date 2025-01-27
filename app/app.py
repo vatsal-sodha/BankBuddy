@@ -345,6 +345,7 @@ def upload_pdf():
         raise ValueError("Invalid data format from PDF extraction")
     transaction_ids = add_trasactions_to_db(data['transactions'], account_id)
     _ = Balance.add_balance(account_id, data['account_balance'], data['statement_date'] )
+    Account.update_last_statement_date(account_id)
 
     os.remove(file_path)
     return jsonify({"message": f"""Added transactions:{len(transaction_ids)} to database"""})
@@ -526,7 +527,7 @@ def add_trasactions_to_db(transactions, account_id):
             )
 
             # Check if a transaction with the same key exists
-            existing_transaction = Transaction.get_by_key(temp_transaction.key)
+            existing_transaction = Transaction.get_transaction_by_key(temp_transaction.key)
 
             # If exisitng transaction avoid insert into db
             if existing_transaction:
@@ -595,10 +596,17 @@ def backup_database():
         print(f"Backup created successfully at {backup_path}")
     except Exception as e:
         print(f"Error during backup: {str(e)}")
+
 # Schedule the backup job
 scheduler = BackgroundScheduler()
-# trigger = CronTrigger(hour=2, minute=0)  # Daily at 2:00 AM
-scheduler.add_job(backup_database)
+
+# Trigger backup immediately when the app starts or restarts
+scheduler.add_job(backup_database, next_run_time=datetime.now())
+
+# Schedule daily backup at 2:00 AM
+trigger = CronTrigger(hour=2, minute=0)  # Daily at 2:00 AM
+scheduler.add_job(backup_database, trigger=trigger)
+
 scheduler.start()
 
 def initialize_scheduler():
