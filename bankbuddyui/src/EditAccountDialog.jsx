@@ -99,54 +99,6 @@ const EditAccountDialog = ({ open, account, onClose, onSubmit }) => {
                         }}
                         helperText="Enter the last 4 digits of your account"
                     />
-                    {/* <Grid2 container spacing={2} sx={{ mt: 1 }}>
-                        <Grid2 item xs={12}>
-                            <TextField
-                                required
-                                fullWidth
-                                label="Account Name"
-                                name="name"
-                                value={formData.account_name}
-                                onChange={handleChange}
-                            />
-                        </Grid2>
-                        <Grid2 item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Institution"
-                                name="institution"
-                                value={formData.institution}
-                                onChange={handleChange}
-                            />
-                        </Grid2>
-                        <Grid2 item xs={12}>
-                            <InputLabel>Account Type</InputLabel>
-                            <Select
-                                name="account_type"
-                                value={formData.account_type}
-                                label="Account Type"
-                                onChange={handleChange}
-                            >
-                                <MenuItem value="credit/debit">Credit/Debit Card</MenuItem>
-                                <MenuItem value="checking/savings">Checking/Savings Account</MenuItem>
-                                <MenuItem value="other">Other</MenuItem>
-                            </Select>
-                        </Grid2>
-                        <Grid2 item xs={12}>
-                            <TextField
-                                required
-                                fullWidth
-                                label="Last 4 Digits"
-                                name="last_4_digits"
-                                value={formData.last_4_digits}
-                                onChange={handleChange}
-                                inputProps={{
-                                    maxLength: 4,
-                                    pattern: '[0-9]{4}'
-                                }}
-                            />
-                        </Grid2>
-                    </Grid2> */}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={onClose}>Cancel</Button>

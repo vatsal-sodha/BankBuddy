@@ -31,6 +31,34 @@ const AccountsTable = ({ accounts, onEdit, onDelete }) => {
         setDeleteDialog({ open: false, accountId: null });
     };
 
+    const getBalanceColor = (type, balance) => {
+        const numBalance = parseFloat(balance);
+
+        if (type.toLowerCase().includes('checking') || type.toLowerCase().includes('savings')) {
+            return numBalance >= 0 ? 'success.main' : 'error.main';
+        } else if (type.toLowerCase().includes('credit') || type.toLowerCase().includes('debit')) {
+            return numBalance <= 0 ? 'success.main' : 'error.main';
+        }
+        return 'text.primary';
+    };
+
+    const formatCurrency = (amount) => {
+        const numAmount = parseFloat(amount);
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(numAmount);
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
     return (
         <>
             <TableContainer component={Paper}>
@@ -41,7 +69,7 @@ const AccountsTable = ({ accounts, onEdit, onDelete }) => {
                             <TableCell>Institution</TableCell>
                             <TableCell>Account Type</TableCell>
                             <TableCell>Balance</TableCell>
-                            <TableCell>Recent Statmenet Upload Date</TableCell>
+                            <TableCell>Recent Statmenet Date</TableCell>
                             {/* <TableCell>Last 4 Digits</TableCell> */}
                             {/* <TableCell align="right">Actions</TableCell> */}
                         </TableRow>
@@ -52,8 +80,10 @@ const AccountsTable = ({ accounts, onEdit, onDelete }) => {
                                 <TableCell>{account.name} - {account.last_4_digits}</TableCell>
                                 <TableCell>{account.institution || 'N/A'}</TableCell>
                                 <TableCell>{account.type}</TableCell>
-                                <TableCell>{account.balance}</TableCell>
-                                <TableCell>{account.last_statement_date}</TableCell>
+                                <TableCell sx={{ color: getBalanceColor(account.type, account.balance) }}>
+                                    {formatCurrency(account.balance)}
+                                </TableCell>
+                                <TableCell>{formatDate(account.last_statement_date)}</TableCell>
                                 <TableCell align="right">
                                     <IconButton
                                         color="primary"
