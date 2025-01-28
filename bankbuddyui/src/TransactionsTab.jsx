@@ -279,8 +279,25 @@ const TransactionsTab = () => {
         {
             field: 'amount', headerName: 'Amount', filter: true, editable: true,
             cellStyle: params => {
+                const { account_type, amount } = params.data;
+
+                if (account_type === 'checking/savings') {
+                    // Positive amounts are green
+                    return {
+                        color: amount > 0 ? 'green' : 'black',
+                        fontWeight: '300'
+                    };
+                } else if (account_type === 'credit/debit') {
+                    // Negative amounts are green
+                    return {
+                        color: amount < 0 ? 'green' : 'black',
+                        fontWeight: '300'
+                    };
+                }
+
+                // Default style
                 return {
-                    color: params.value < 0 ? 'green' : 'black',
+                    color: 'black',
                     fontWeight: '300'
                 };
             },

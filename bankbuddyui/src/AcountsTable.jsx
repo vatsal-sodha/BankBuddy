@@ -34,9 +34,9 @@ const AccountsTable = ({ accounts, onEdit, onDelete }) => {
     const getBalanceColor = (type, balance) => {
         const numBalance = parseFloat(balance);
 
-        if (type.toLowerCase().includes('checking') || type.toLowerCase().includes('savings')) {
+        if (type?.includes('checking') || type?.includes('savings')) {
             return numBalance >= 0 ? 'success.main' : 'error.main';
-        } else if (type.toLowerCase().includes('credit') || type.toLowerCase().includes('debit')) {
+        } else if (type?.includes('credit') || type?.includes('debit')) {
             return numBalance <= 0 ? 'success.main' : 'error.main';
         }
         return 'text.primary';

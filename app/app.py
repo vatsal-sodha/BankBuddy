@@ -344,7 +344,8 @@ def upload_pdf():
     if not isinstance(data, dict) or 'transactions' not in data or 'account_balance' not in data or 'statement_date' not in data:
         raise ValueError("Invalid data format from PDF extraction")
     transaction_ids = add_trasactions_to_db(data['transactions'], account_id)
-    _ = Balance.add_balance(account_id, data['account_balance'], data['statement_date'] )
+    balance = convert_to_float(data['account_balance'])
+    _ = Balance.add_balance(account_id, balance, data['statement_date'] )
     Account.update_last_statement_date(account_id)
 
     os.remove(file_path)

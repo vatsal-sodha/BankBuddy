@@ -1,17 +1,10 @@
-transaction_headers = {'Date', 'Description', 'Amount', 
-                       'Balance', 'Transaction Type', 
-                       'Category', 'Trans Date', 'Post Date'}
+import re
 
-def is_transactions_table(headers):
-    return any(
-        isinstance(header, str) and any(th.lower() in header.lower() for th in transaction_headers)
-        for header in headers
-    )
-
-def is_valid_transactions_table(table_df):
-    if not table_df.empty or table_df.columns.size > 0 :
-        headers = table_df.columns  # First row is assumed to be the header
-        return is_transactions_table(headers)
-    return False
-
+def convert_to_float(amount_str):
+    # Remove any characters that are not digits, decimal points, or minus signs
+    cleaned_str = re.sub(r'[^\d.-]', '', amount_str)
+    try:
+        return float(cleaned_str)
+    except ValueError:
+        raise ValueError(f"Invalid amount string: {amount_str}")
 
