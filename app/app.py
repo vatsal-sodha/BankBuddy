@@ -378,7 +378,7 @@ def add_transaction():
                                     transaction_date, 
                                     data['description'],
                                     data['category'],
-                                    float(data['amount']))
+                                    convert_to_float(data['amount']))
         return jsonify({'message': 'Transaction added successfully!'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
