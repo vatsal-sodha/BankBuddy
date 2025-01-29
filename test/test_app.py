@@ -6,8 +6,8 @@ from models.account import Account
 from models.transaction import Transaction
 from datetime import datetime
 import json
-from unittest.mock import patch
-from tempfile import NamedTemporaryFile
+# from unittest.mock import patch
+# from tempfile import NamedTemporaryFile
 
 
 class BankBuddyTestCase(unittest.TestCase):

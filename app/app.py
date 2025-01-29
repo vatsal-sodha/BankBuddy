@@ -618,7 +618,20 @@ def initialize_scheduler():
         scheduler.start()
 # Create tables
 with app.app_context():
-    db.create_all()
+    parent_dir = os.getcwd()  # Current working directory
+    possible_paths = [
+        os.path.join(parent_dir, DATABASE_NAME),
+        os.path.join(parent_dir, 'instance', DATABASE_NAME)
+    ]
+
+    # Find the first valid database file path
+    src = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            src = path
+            break
+    if not src:
+        db.create_all()
     initialize_scheduler()
 
 # Ensure app runs only in Flask's debug mode or as a WSGI app

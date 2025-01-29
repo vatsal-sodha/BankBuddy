@@ -4,9 +4,7 @@ import {
     Tabs,
     Tab,
     Typography,
-    TabPanel,
     Box,
-    Paper,
 } from '@mui/material';
 
 import AccountsTab from './AccountsTab';
@@ -16,8 +14,6 @@ import React, { useState } from 'react';
 
 function App() {
     const [currentTab, setCurrentTab] = useState(0);
-    const [fromDate, setFromDate] = useState(null);
-    const [toDate, setToDate] = useState(null);
 
     const handleTabChange = (event, newValue) => {
         setCurrentTab(newValue);
