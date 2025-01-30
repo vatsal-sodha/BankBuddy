@@ -19,10 +19,10 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
-# Create and activate virtual environment
-echo -e "${GREEN}Creating Python virtual environment...${NC}"
-python3 -m venv venv
-source venv/bin/activate
+# Create and activate conda environment
+echo -e "${GREEN}Creating conda environment...${NC}"
+conda create --name bankbuddy python=3.8 -y
+conda activate bankbuddy
 
 # Install Python dependencies
 echo -e "${GREEN}Installing Python dependencies...${NC}"
@@ -37,17 +37,15 @@ fi
 
 # Install frontend dependencies
 echo -e "${GREEN}Installing frontend dependencies...${NC}"
-cd frontend
+cd bankbuddyui
 npm install
+
+# Export the Anthropic API key
+export ANTHROPIC_API_KEY='your-api-key-here'
 
 # Start both servers
 echo -e "${GREEN}Starting servers...${NC}"
 # Start Flask server in background
-cd ../backend
-export FLASK_APP=app.py
-export FLASK_ENV=development
-flask run &
-
+gnome-terminal -- bash -c "conda activate bankbuddy && export FLASK_APP=app.py && export FLASK_ENV=development && flask run"
 # Start React application
-cd ../frontend
-npm start
+gnome-terminal -- bash -c "cd frontend && npm start"

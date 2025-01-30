@@ -11,7 +11,7 @@ BankBuddy is a financial management application designed to help users manage th
 
 ## Prerequisites
 
-- Python 3.8 or higher
+- Anaconda or Miniconda
 - Node.js 14.0 or higher
 - npm (usually comes with Node.js)
 - Git (for cloning the repository)
@@ -31,16 +31,16 @@ ANTHROPIC_API_KEY=your-api-key-here
 
 3. Run the setup script:
 ```bash
-# On Windows:
-setup.bat
-
 # On Unix-based systems (Linux/MacOS):
 chmod +x setup.sh
 ./setup.sh
+
+# On Windows:
+setup.bat
 ```
 
 The setup script will automatically:
-- Create a Python virtual environment
+- Create a conda environment
 - Install Python dependencies
 - Install Node.js dependencies
 - Start both the Flask server and React application
@@ -49,15 +49,10 @@ The setup script will automatically:
 
 ### Backend Setup
 
-1. Create and activate a Python virtual environment:
+1. Create and activate a conda environment:
 ```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Unix (Linux/MacOS)
-python3 -m venv venv
-source venv/bin/activate
+conda create --name bankbuddy python=3.8
+conda activate bankbuddy
 ```
 
 2. Install Python dependencies:
@@ -67,21 +62,22 @@ pip install -r requirements.txt
 
 3. Start the Flask server:
 ```bash
-# Windows
-set FLASK_APP=app.py
-set FLASK_ENV=development
-flask run
-
 # Unix (Linux/MacOS)
 export FLASK_APP=app.py
 export FLASK_ENV=development
 flask run
+
+# Windows
+set FLASK_APP=app.py
+set FLASK_ENV=development
+flask run
 ```
+
 ### Frontend Setup
 
 1. Navigate to the React application directory:
 ```bash
-cd frontend
+cd bankbuddyui
 ```
 
 2. Install Node.js dependencies:
@@ -93,6 +89,7 @@ npm install
 ```bash
 npm start
 ```
+
 ## Support
 
 For issues or questions, please [create an issue](https://github.com/vatsal-sodha/BankBuddy/issues) in the repository.

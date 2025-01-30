@@ -1,42 +1,23 @@
+:: filepath: /Users/vatsalsodha/pdfExtract/BankBuddy/setup.bat
 @echo off
-echo Setting up your development environment...
 
-REM Check if Python is installed
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo Python is not installed. Please install Python 3.8 or higher
-    exit /b 1
-)
+:: Create and activate conda environment
+conda create --name bankbuddy python=3.8 -y
+conda activate bankbuddy
 
-REM Check if Node.js is installed
-node --version >nul 2>&1
-if errorlevel 1 (
-    echo Node.js is not installed. Please install Node.js 14.0 or higher
-    exit /b 1
-)
-
-REM Create and activate virtual environment
-echo Creating Python virtual environment...
-python -m venv venv
-call venv\Scripts\activate
-
-REM Install Python dependencies
-echo Installing Python dependencies...
+:: Install Python dependencies
 pip install -r requirements.txt
 
-REM Check if .env file exists
-if not exist .env (
-    echo Creating .env file...
-    echo ANTHROPIC_API_KEY=your-api-key-here > .env
-    echo Please update the .env file with your actual API key
-)
+:: Navigate to the frontend directory and install Node.js dependencies
+cd bankbuddyui
+npm install
 
-REM Install frontend dependencies
-echo Installing frontend dependencies...
-cd frontend
-call npm install
+:: Navigate back to the root directory
+cd ..
 
-REM Start both servers
-echo Starting servers...
-start cmd /c "cd backend && set FLASK_APP=app.py && set FLASK_ENV=development && flask run"
-start cmd /c "cd frontend && npm start"
+:: Export the Anthropic API key
+set ANTHROPIC_API_KEY=your-api-key-here
+
+:: Start the Flask server and React application
+start cmd /k "conda activate bankbuddy && set FLASK_APP=app.py && set FLASK_ENV=development && flask run"
+start cmd /k "cd frontend && npm start"
