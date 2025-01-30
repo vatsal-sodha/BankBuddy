@@ -20,4 +20,4 @@ set ANTHROPIC_API_KEY=your-api-key-here
 
 :: Start the Flask server and React application
 start cmd /k "conda activate bankbuddy && set FLASK_APP=app.py && set FLASK_ENV=development && flask run"
-start cmd /k "cd frontend && npm start"
+start cmd /k "cd bankbuddyui && npm start"

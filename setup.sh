@@ -48,4 +48,4 @@ echo -e "${GREEN}Starting servers...${NC}"
 # Start Flask server in background
 gnome-terminal -- bash -c "conda activate bankbuddy && export FLASK_APP=app.py && export FLASK_ENV=development && flask run"
 # Start React application
-gnome-terminal -- bash -c "cd frontend && npm start"
+gnome-terminal -- bash -c "cd bankbuddyui && npm start"
