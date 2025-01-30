@@ -23,6 +23,10 @@ BankBuddy is a privacy-focused personal finance analyzer that processes your ban
 3. View all your transactions and balances in one dashboard
 4. Analyze spending across categories
 
+## Demo
+
+[![Watch the demo](https://img.youtube.com/vi/HuZ-kBGSFP4/0.jpg)](https://youtu.be/HuZ-kBGSFP4)
+
 ## Prerequisites
 
 - Anaconda or Miniconda
