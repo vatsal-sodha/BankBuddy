@@ -1,13 +1,27 @@
 # BankBuddy
 
-BankBuddy is a financial management application designed to help users manage their bank accounts, transactions, and financial summaries. The application provides features for uploading bank statements, categorizing transactions, and generating financial reports.
+BankBuddy is a privacy-focused personal finance analyzer that processes your bank statements locally, helping you track spending without connecting to any external services.
 
-## Features
+## Key Features
 
-- **Account Management**: Add, edit, and delete bank accounts.
-- **Transaction Management**: Add, edit, and delete transactions. Upload bank statements in PDF format and extract transactions using AI.
-- **Financial Summary**: Generate financial summaries and view transactions by categories.
-- **Backup**: Automatic daily backup of the database.
+### 🔒 Privacy & Security
+- Local SQL database storage only - your data never leaves your system
+- No bank account linking or third-party integrations
+- Automatic masking of sensitive information
+- Daily automatic database backups for data safety
+
+### 📊 Financial Management
+- Upload and analyze statements from multiple bank accounts
+- Automatic transaction categorization
+- Track account balances in one place
+- Generate detailed financial summaries
+- View spending patterns and transactions by category
+
+### 💰 How It Works
+1. Upload your bank statements
+2. BankBuddy extracts and masks sensitive data
+3. View all your transactions and balances in one dashboard
+4. Analyze spending across categories
 
 ## Prerequisites
 
