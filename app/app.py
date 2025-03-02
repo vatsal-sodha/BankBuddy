@@ -459,6 +459,12 @@ def edit_account(account_id):
 def delete_account(account_id):
     try:
         account = Account.query.get_or_404(account_id)
+          # Delete all associated transaction records
+        Transaction.query.filter_by(account_id=account_id).delete()
+        
+        # Delete all associated balance records
+        Balance.query.filter_by(account_id=account_id).delete()
+        
         db.session.delete(account)
         db.session.commit()
         
