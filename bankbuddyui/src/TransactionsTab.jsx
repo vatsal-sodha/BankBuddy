@@ -432,9 +432,12 @@ const TransactionsTab = () => {
                         </Typography>
                     </Grid2>
                     <Grid2 item xs={12} md={2}>
-                        <Typography variant="subtitle2">Refunds</Typography>
-                        <Typography variant="body1" color="success.main">
-                            {formatCurrency(summary.refunds)}
+                        <Typography variant="subtitle2">Net Position</Typography>
+                        <Typography
+                            variant="body1"
+                            color={summary.net_position >= 0 ? "success.main" : "error.main"}
+                        >
+                            {formatCurrency(summary.net_position)}
                         </Typography>
                     </Grid2>
                     <Grid2 item xs={12} md={2}>
@@ -444,12 +447,9 @@ const TransactionsTab = () => {
                         </Typography>
                     </Grid2>
                     <Grid2 item xs={12} md={2}>
-                        <Typography variant="subtitle2">Net Position</Typography>
-                        <Typography
-                            variant="body1"
-                            color={summary.net_position >= 0 ? "success.main" : "error.main"}
-                        >
-                            {formatCurrency(summary.net_position)}
+                        <Typography variant="subtitle2">Refunds</Typography>
+                        <Typography variant="body1" color="success.main">
+                            {formatCurrency(summary.refunds)}
                         </Typography>
                     </Grid2>
                 </Grid2>

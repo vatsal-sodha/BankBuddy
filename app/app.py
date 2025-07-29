@@ -47,29 +47,30 @@ def extract_transactions_from_pdf(pdf_path, api_key):
         raise Exception(f"Error reading PDF: {str(e)}")
     
     # Prepare prompt for Claude
-    prompt = f"""Below is the text from a credit card statement.
-    Please extract all transactions and return them as a JSON array.
-    Each transaction should have these fields if available:
-    - transaction_date (in YYYY-MM-DD format)
-    - description
-    - amount
-    - category
-    Only return the JSON array, no other text.
-    Always format dates as YYYY-MM-DD, even if they appear differently in the statement.
-    Also if year is missing infer the year from rest of the texts and return in it YYYY-MM-DD format
-    - Can you please also classify the transaction based on the description of the transaction
-    among one of the categories from below:
-    - paycheck, other income,
-    - transfer, credit card payment
-    - home, utilities, rent
-    - auto, gas, parking, travel
-    - restaurant, groceries, medical
-    - amazon, walmart, shopping
-    - subscriptions, donations, insurance
-    - investments, other expenses
-    All categories above are comma separated and do return category for each transaction
-    Can you please also extract statement date in YYYY-MM-DD format and account balance as of that date and return in json format along with all transactions
-    Please return account_balance (as a string), statement_date, and transactions in JSON format
+    prompt = f"""RESPOND WITH VALID JSON ONLY - NO OTHER TEXT
+
+    Extract transactions from this credit card statement as JSON:
+
+    {{
+        "statement_date": "YYYY-MM-DD or null",
+        "account_balance": "numeric value or null",
+        "transactions": [
+            {{
+                "transaction_date": "YYYY-MM-DD", 
+                "description": "string",
+                "amount": -123.45,  
+                "category": "string from allowed list"
+            }}
+        ]
+    }}
+
+    IMPORTANT: 
+    - amount must be a NUMBER (not string)
+    - Use negative numbers for debits/charges
+    - Use positive numbers for credits/payments
+    - Do not include currency symbols or commas
+
+    Allowed categories: paycheck, other income, transfer, credit card payment, home, utilities, rent, auto, gas, parking, travel, restaurant, groceries, medical, amazon, walmart, shopping, subscriptions, donations, insurance, investments, other expenses
 
     Statement text:
     {text}"""
@@ -78,9 +79,8 @@ def extract_transactions_from_pdf(pdf_path, api_key):
         message = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=4000,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            system="You are a JSON API. You only respond with valid JSON objects. Never include explanatory text, markdown formatting, or anything other than pure JSON.",
+            messages=[{"role": "user", "content": prompt}]
         )
         response = message.content[0].text
         
@@ -95,7 +95,35 @@ def extract_transactions_from_pdf(pdf_path, api_key):
         
     except Exception as e:
         raise Exception(f"Error processing with Claude: {str(e)}")
-    
+
+def process_pdf_upload(account_id, file):
+    if not file or file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    if not file.filename.endswith('.pdf'):
+        return jsonify({"error": "Only PDF files are allowed"}), 400
+
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(file_path)
+
+    API_KEY = os.getenv('ANTHROPIC_API_KEY')
+    if not API_KEY:
+        return jsonify({"error": "No Anthropic Key Found"}), 500
+
+    data = extract_transactions_from_pdf(file_path, API_KEY)
+    if not isinstance(data, dict) or 'transactions' not in data or 'account_balance' not in data or 'statement_date' not in data:
+        os.remove(file_path)
+        return jsonify({'error': 'Invalid data format from PDF extraction'}), 500
+
+    transaction_ids = add_trasactions_to_db(data['transactions'], account_id)
+    # balance = convert_to_float(data['account_balance'])
+    balance = data['account_balance'] if data['account_balance'] is not None else 0.0
+    _ = Balance.add_balance(account_id, balance, data['statement_date'])
+    Account.update_last_statement_date(account_id)
+
+    os.remove(file_path)
+    return jsonify({"message": f"Added {len(transaction_ids)} transactions to database"}), 200
+
  
 # Directory to temporarily store uploaded files
 UPLOAD_FOLDER = './uploads'
@@ -318,38 +346,28 @@ def update_transaction():
     
 @app.route('/api/upload-statement', methods=['POST'])
 def upload_pdf():
-    # Get the account_id from the form data
     account_id = request.form.get('account_id')
     if not account_id:
         return jsonify({'error': 'Account ID is required'}), 400
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+    file = request.files.get('file')
+    return process_pdf_upload(account_id, file)
 
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No file selected"}), 400
+@app.route('/api/upload-statement-by-name', methods=['POST'])
+def upload_pdf_by_name():
+    name = request.form.get('name')
+    last_4_digits = request.form.get('last_4_digits')
+    if not name or not last_4_digits:
+        return jsonify({'error': 'Missing name or last_4_digits'}), 400
 
-    if not file.filename.endswith('.pdf'):
-        return jsonify({"error": "Only PDF files are allowed"}), 400
+    account = Account.query.filter_by(name=name, last_4_digits=last_4_digits).first()
+    if not account:
+        return jsonify({'error': 'Account not found'}), 404
 
-    # Save the file temporarily
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'No file provided'}), 400
+    return process_pdf_upload(account.account_id, file)
 
-    API_KEY = os.getenv('ANTHROPIC_API_KEY')
-    if not API_KEY:
-        raise ValueError("Please set ANTHROPIC_API_KEY environment variable")
-    
-    data = extract_transactions_from_pdf(file_path, API_KEY)
-    if not isinstance(data, dict) or 'transactions' not in data or 'account_balance' not in data or 'statement_date' not in data:
-        raise ValueError("Invalid data format from PDF extraction")
-    transaction_ids = add_trasactions_to_db(data['transactions'], account_id)
-    balance = convert_to_float(data['account_balance'])
-    _ = Balance.add_balance(account_id, balance, data['statement_date'] )
-    Account.update_last_statement_date(account_id)
-
-    os.remove(file_path)
-    return jsonify({"message": f"""Added transactions:{len(transaction_ids)} to database"""})
 
 @app.route('/api/add-transaction', methods=['POST'])
 def add_transaction():
