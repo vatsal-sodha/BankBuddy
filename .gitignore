@@ -3,3 +3,4 @@ node_modules
 **.pyc
 **.db
 backups
+.DS_Store
