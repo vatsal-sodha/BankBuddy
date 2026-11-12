@@ -43,7 +43,7 @@ const UploadPDF = ({ open, onClose }) => {
         if (!file || !selectedAccount) {
             setToast({
                 open: true,
-                message: "Please select both an account and a PDF file",
+                message: "Please select both an account and a PDF or CSV file",
                 severity: 'warning'
             });
             return;
@@ -75,10 +75,10 @@ const UploadPDF = ({ open, onClose }) => {
                 throw new Error(responseData.error || 'Upload failed');
             }
         } catch (error) {
-            console.error("Error uploading PDF:", error);
+            console.error("Error uploading statement:", error);
             setToast({
                 open: true,
-                message: "Failed to upload PDF",
+                message: error.message || "Failed to upload statement",
                 severity: 'error'
             });
         } finally {
@@ -138,10 +138,10 @@ const UploadPDF = ({ open, onClose }) => {
                                 startIcon={<CloudUploadIcon />}
                                 sx={{ mb: 2 }}
                             >
-                                Upload PDF
+                                Upload PDF or CSV
                                 <input
                                     type="file"
-                                    accept="application/pdf"
+                                    accept=".pdf,.csv,application/pdf,text/csv"
                                     onChange={handleFileChange}
                                     hidden
                                 />
