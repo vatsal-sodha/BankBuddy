@@ -1,11 +1,11 @@
-from datetime import datetime
-from anthropic import Anthropic
+from collections import Counter
+from datetime import datetime, timedelta
 from flask import Flask, json, request, jsonify
 from flask_cors import CORS
 import os
-import pdfplumber
+from werkzeug.utils import secure_filename
 from app.app_utils import *
-from app.privacy_filter import PrivacyFilter
+from app.statement_extractor import extract_transactions, is_supported_file
 from dotenv import load_dotenv
 from models.account import Account
 from models.transaction import Transaction
@@ -19,135 +19,61 @@ app = Flask(__name__)
 app.debug = True
 CORS(app)
 DATABASE_NAME = "bankBuddy.db"
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + DATABASE_NAME
+# Tests point this at a throwaway database and turn off the backup scheduler
+TESTING = os.getenv("BANKBUDDY_TESTING") == "1"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "BANKBUDDY_DATABASE_URI", "sqlite:///" + DATABASE_NAME
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 
-def extract_transactions_from_pdf(pdf_path, api_key):
-    """
-    Extract credit card transactions from a PDF statement using Claude AI.
-
-    Args:
-        pdf_path (str): Path to the PDF file
-        api_key (str): Anthropic API key
-
-    Returns:
-        list: List of transaction dictionaries
-    """
-    # Initialize Anthropic client
-    client = Anthropic(api_key=api_key)
-    privacy_filter = PrivacyFilter()
-
-    # Extract text from PDF
-    try:
-        with pdfplumber.open(pdf_path) as pdf:
-            text = "\n".join(page.extract_text() for page in pdf.pages)
-            text = privacy_filter.hash_sensitive_data(text)
-    except Exception as e:
-        raise Exception(f"Error reading PDF: {str(e)}")
-
-    # Prepare prompt for Claude
-    prompt = f"""RESPOND WITH VALID JSON ONLY - NO OTHER TEXT
-
-    Extract transactions from this credit card statement as JSON:
-
-    {{
-        "statement_date": "YYYY-MM-DD or null",
-        "account_balance": "numeric value or null",
-        "transactions": [
-            {{
-                "transaction_date": "YYYY-MM-DD", 
-                "description": "string",
-                "amount": -123.45,  
-                "category": "string from allowed list"
-            }}
-        ]
-    }}
-
-    IMPORTANT: 
-    - amount must be a NUMBER (not string)
-    - Use negative numbers for debits/charges
-    - Use positive numbers for credits/payments
-    - Do not include currency symbols or commas
-
-    Allowed categories: paycheck, other income, transfer, credit card payment, home, utilities, rent, auto, gas, parking, travel, restaurant, groceries, medical, amazon, walmart, shopping, subscriptions, donations, insurance, investments, other expenses
-
-    Statement text:
-    {text}"""
-    # Get response from Claude
-    try:
-        message = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=4000,
-            # system="You are a JSON API. You only respond with valid JSON objects. Never include explanatory text, markdown formatting, or anything other than pure JSON.",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        response = message.content[0].text
-
-        # Parse JSON response
-        # Clean the response - remove markdown code blocks if present
-        response = response.strip()
-
-        # Remove opening code fence
-        if response.startswith("```json"):
-            response = response[7:]  # Remove ```json
-        elif response.startswith("```"):
-            response = response[3:]  # Remove ```
-
-        # Remove closing code fence
-        if response.endswith("```"):
-            response = response[:-3]  # Remove trailing ```
-
-        # Strip again after removing fences
-        response = response.strip()
-
-        # Parse JSON response
-        data = json.loads(response)
-
-        # Basic validation
-        if not isinstance(data["transactions"], list):
-            raise ValueError("Response is not a JSON array")
-
-        return data
-
-    except Exception as e:
-        raise Exception(f"Error processing with Claude: {str(e)}")
-
-
 def process_pdf_upload(account_id, file):
+    """Process an uploaded PDF or CSV statement for the given account."""
     if not file or file.filename == "":
         return jsonify({"error": "No file selected"}), 400
-    if not file.filename.endswith(".pdf"):
-        return jsonify({"error": "Only PDF files are allowed"}), 400
-
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
+    if not is_supported_file(file.filename):
+        return jsonify({"error": "Only PDF and CSV files are allowed"}), 400
 
     API_KEY = os.getenv("ANTHROPIC_API_KEY")
     if not API_KEY:
         return jsonify({"error": "No Anthropic Key Found"}), 500
 
-    data = extract_transactions_from_pdf(file_path, API_KEY)
-    if (
-        not isinstance(data, dict)
-        or "transactions" not in data
-        or "account_balance" not in data
-        or "statement_date" not in data
-    ):
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    file_path = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename))
+    file.save(file_path)
+    is_csv = file_path.lower().endswith(".csv")
+
+    try:
+        data = extract_transactions(file_path, API_KEY)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
         os.remove(file_path)
-        return jsonify({"error": "Invalid data format from PDF extraction"}), 500
 
-    transaction_ids = add_trasactions_to_db(data["transactions"], account_id)
-    # balance = convert_to_float(data['account_balance'])
-    balance = data["account_balance"] if data["account_balance"] is not None else 0.0
-    _ = Balance.add_balance(account_id, balance, data["statement_date"])
-    Account.update_last_statement_date(account_id)
+    # Claude returns negative = money out for every account. This app stores
+    # credit card charges as positive (see get_financial_summary), so flip them.
+    account = db.session.get(Account, int(account_id))
+    if account and account.type == "credit/debit":
+        for transaction in data["transactions"]:
+            if isinstance(transaction.get("amount"), (int, float)):
+                transaction["amount"] = -transaction["amount"]
 
-    os.remove(file_path)
+    added_ids, skipped = add_trasactions_to_db(data["transactions"], account_id)
+
+    balance = data.get("account_balance")
+    statement_date = data.get("statement_date")
+    # CSV exports usually have no statement balance; don't record a fake 0.0 one
+    if statement_date and (balance is not None or not is_csv):
+        Balance.add_balance(account_id, balance if balance is not None else 0.0, statement_date)
+        Account.update_last_statement_date(account_id)
+
     return jsonify(
-        {"message": f"Added {len(transaction_ids)} transactions to database"}
+        {
+            "message": f"Added {len(added_ids)} transactions, skipped {skipped} duplicates",
+            "added": len(added_ids),
+            "skipped_duplicates": skipped,
+        }
     ), 200
 
 
@@ -202,6 +128,28 @@ def get_transactions():
         return jsonify({"error": "An error occurred.", "details": str(e)}), 500
 
 
+# Categories that move money between accounts rather than earning or spending it.
+# Credit card spending is counted on the card itself, so paying the card is skipped.
+EXCLUDED_CATEGORIES = {"credit card payment", "transfer"}
+# Categories tracked in their own bucket instead of income or expense
+# (value: summary field name)
+SEPARATE_CATEGORIES = {"investments": "net_invested", "marcus transfer": "marcus_net"}
+# Categories that are income; every other category is spending (money coming
+# back in a spending category, e.g. a refund, reduces spending)
+INCOME_CATEGORIES = {"paycheck", "other income"}
+
+
+def money_flow(transaction):
+    """
+    Amount from the user's point of view: positive = money in, negative = money out.
+    Checking/savings already store it this way; credit cards store charges as
+    positive, so their sign is flipped.
+    """
+    if transaction.account.type == "credit/debit":
+        return -transaction.amount
+    return transaction.amount
+
+
 @app.route("/api/transactions-by-categories", methods=["GET"])
 def get_transactions_by_categories():
     try:
@@ -220,14 +168,9 @@ def get_transactions_by_categories():
         transaction_categories = {}
 
         for transaction in transactions:
-            if (
-                transaction.category == "credit card payment"
-                and transaction.account.type != "checking/savings"
-            ):
+            if transaction.category in EXCLUDED_CATEGORIES:
                 continue
-            amount = transaction.amount
-            if transaction.account.type == "credit/debit":
-                amount = -amount
+            amount = money_flow(transaction)
             if transaction.category not in transaction_categories:
                 transaction_categories[transaction.category] = amount
             else:
@@ -256,32 +199,42 @@ def get_financial_summary():
         # Get all transactions in date range
         transactions = Transaction.get_transactions_in_date_range(from_date, to_date)
 
+        # income:  paycheck + other income
+        # expense: net money out in every other category (refunds reduce it),
+        #          from checking and credit cards alike
+        # investments and marcus transfers are reported separately (net amount moved in)
         total_income = 0
         total_expense = 0
         refunds = 0
         credit_card_expense = 0
+        separate = {field: 0 for field in SEPARATE_CATEGORIES.values()}
 
         for transaction in transactions:
-            account = transaction.account
-            amount = transaction.amount
+            category = transaction.category
+            if category in EXCLUDED_CATEGORIES:
+                continue
+            flow = money_flow(transaction)
+            if category in SEPARATE_CATEGORIES:
+                separate[SEPARATE_CATEGORIES[category]] -= flow
+                continue
 
-            if account.type.lower() == "checking/savings":
-                if amount > 0:
-                    total_income += amount
-                else:
-                    total_expense += abs(amount)
-            elif account.type.lower() == "credit/debit":
-                if amount > 0:
-                    credit_card_expense += amount
-                elif transaction.category != "credit card payment":
-                    refunds += abs(amount)
+            if category in INCOME_CATEGORIES:
+                total_income += flow
+                continue
+
+            total_expense -= flow
+            if flow > 0:
+                refunds += flow
+            elif transaction.account.type == "credit/debit":
+                credit_card_expense += -flow
 
         summary = {
-            "total_income": total_income,
-            "total_expense": total_expense,
-            "refunds": refunds,
-            "credit_card_expense": credit_card_expense,
-            "net_position": total_income - total_expense,
+            "total_income": round(total_income, 2),
+            "total_expense": round(total_expense, 2),
+            "refunds": round(refunds, 2),
+            "credit_card_expense": round(credit_card_expense, 2),
+            **{field: round(value, 2) for field, value in separate.items()},
+            "net_position": round(total_income - total_expense, 2),
         }
 
         return jsonify(summary)
@@ -598,55 +551,82 @@ def remove_duplicates():
         return jsonify({"error": str(e)}), 500
 
 
+DUPLICATE_DATE_WINDOW_DAYS = 3
+
+
 def add_trasactions_to_db(transactions, account_id):
-    transaction_ids = []
+    """
+    Insert transactions, skipping ones already stored for this account.
+
+    A new transaction is a duplicate when the account already has a transaction
+    with the same absolute amount within DUPLICATE_DATE_WINDOW_DAYS days.
+    Descriptions, categories and signs are ignored because they vary between
+    PDF statements and CSV exports of the same transaction. Each stored
+    transaction can only match one new transaction, so genuine repeats (e.g.
+    two identical purchases on the same day) are still added.
+
+    Returns (added_transaction_ids, skipped_duplicate_count).
+    """
+    account_id = int(account_id)
+    parsed = []
     for transaction in transactions:
-        # Extract fields from the transaction dictionary
-        transaction_date_str = transaction.get("transaction_date")
-        description = transaction.get("description")
-        category = transaction.get("category")
-        amount = transaction.get("amount")
-        comment = transaction.get("comment", None)
-
         try:
-            transaction_date = datetime.strptime(
-                transaction_date_str, "%Y-%m-%d"
-            ).date()
-            temp_transaction = Transaction(
-                account_id=account_id,
-                transaction_date=transaction_date,
-                description=description,
-                category=category,
-                amount=amount,
-            )
-
-            # Check if a transaction with the same key exists
-            existing_transaction = Transaction.get_transaction_by_key(
-                temp_transaction.key
-            )
-
-            # If exisitng transaction avoid insert into db
-            if existing_transaction:
-                print(
-                    f"Duplicate transaction detected, skipping: {temp_transaction.key}"
+            parsed.append(
+                (
+                    datetime.strptime(transaction["transaction_date"], "%Y-%m-%d").date(),
+                    float(transaction["amount"]),
+                    transaction,
                 )
-                continue
+            )
+        except (KeyError, TypeError, ValueError) as e:
+            print(f"Skipping unparseable transaction {transaction}: {e}")
+    if not parsed:
+        return [], 0
 
-            new_transaction = Transaction.add_transaction(
+    window = timedelta(days=DUPLICATE_DATE_WINDOW_DAYS)
+    existing = Transaction.query.filter(
+        Transaction.account_id == account_id,
+        Transaction.transaction_date >= min(d for d, _, _ in parsed) - window,
+        Transaction.transaction_date <= max(d for d, _, _ in parsed) + window,
+    ).all()
+    unmatched = Counter(
+        (t.transaction_date, round(abs(t.amount), 2)) for t in existing
+    )
+    offsets = sorted(
+        range(-DUPLICATE_DATE_WINDOW_DAYS, DUPLICATE_DATE_WINDOW_DAYS + 1), key=abs
+    )
+
+    new_transactions = []
+    skipped = 0
+    for transaction_date, amount, transaction in parsed:
+        abs_amount = round(abs(amount), 2)
+        match = next(
+            (
+                (transaction_date + timedelta(days=o), abs_amount)
+                for o in offsets
+                if unmatched[(transaction_date + timedelta(days=o), abs_amount)] > 0
+            ),
+            None,
+        )
+        if match:
+            unmatched[match] -= 1
+            skipped += 1
+            continue
+        new_transactions.append(
+            Transaction(
                 account_id=account_id,
                 transaction_date=transaction_date,
-                description=description,
-                category=category,
+                description=transaction.get("description") or "",
+                category=transaction.get("category"),
                 amount=amount,
-                comment=comment,
+                comment=transaction.get("comment"),
             )
-            print(f"Added transaction: {new_transaction.transaction_id}")
-            transaction_ids.append(new_transaction.transaction_id)
-        except ValueError as e:
-            print(f"Error parsing date: {e}")
-        except Exception as e:
-            print(f"Failed to add transaction for {transaction}: {e}")
-    return transaction_ids
+        )
+
+    db.session.add_all(new_transactions)
+    db.session.commit()
+    print(f"Added {len(new_transactions)} transactions, skipped {skipped} duplicates")
+    return [t.transaction_id for t in new_transactions], skipped
 
 
 def get_all_accounts_from_db():
@@ -703,14 +683,15 @@ def backup_database():
 # Schedule the backup job
 scheduler = BackgroundScheduler()
 
-# Trigger backup immediately when the app starts or restarts
-scheduler.add_job(backup_database, next_run_time=datetime.now())
+if not TESTING:
+    # Trigger backup immediately when the app starts or restarts
+    scheduler.add_job(backup_database, next_run_time=datetime.now())
 
-# Schedule daily backup at 2:00 AM
-trigger = CronTrigger(hour=2, minute=0)  # Daily at 2:00 AM
-scheduler.add_job(backup_database, trigger=trigger)
+    # Schedule daily backup at 2:00 AM
+    trigger = CronTrigger(hour=2, minute=0)  # Daily at 2:00 AM
+    scheduler.add_job(backup_database, trigger=trigger)
 
-scheduler.start()
+    scheduler.start()
 
 
 def initialize_scheduler():
@@ -721,23 +702,24 @@ def initialize_scheduler():
         scheduler.start()
 
 
-# Create tables
-with app.app_context():
-    parent_dir = os.getcwd()  # Current working directory
-    possible_paths = [
-        os.path.join(parent_dir, DATABASE_NAME),
-        os.path.join(parent_dir, "instance", DATABASE_NAME),
-    ]
+# Create tables (tests create their own)
+if not TESTING:
+    with app.app_context():
+        parent_dir = os.getcwd()  # Current working directory
+        possible_paths = [
+            os.path.join(parent_dir, DATABASE_NAME),
+            os.path.join(parent_dir, "instance", DATABASE_NAME),
+        ]
 
-    # Find the first valid database file path
-    src = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            src = path
-            break
-    if not src:
-        db.create_all()
-    initialize_scheduler()
+        # Find the first valid database file path
+        src = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                src = path
+                break
+        if not src:
+            db.create_all()
+        initialize_scheduler()
 
 # Ensure app runs only in Flask's debug mode or as a WSGI app
 if __name__ == "__main__":

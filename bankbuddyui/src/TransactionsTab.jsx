@@ -1,493 +1,434 @@
-
-import React, { useState, useMemo } from 'react';
-import { Paper, Box, Button, Typography, Grid2, CircularProgress, Dialog, DialogContent, DialogTitle, DialogActions } from '@mui/material';
-import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
-import { AgGridReact } from "ag-grid-react";
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import {
+    Paper, Box, Button, Typography, Dialog, DialogContent, DialogTitle, DialogActions,
+    TextField, InputAdornment, MenuItem, Autocomplete, ToggleButton, ToggleButtonGroup,
+    Chip, LinearProgress, CircularProgress, IconButton, Tooltip,
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import UploadPDF from './UploadPdf';
-import Toast from './Toast';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
+import CloseIcon from '@mui/icons-material/Close';
+import FilterAltOffOutlinedIcon from '@mui/icons-material/FilterAltOffOutlined';
+import { AllCommunityModule, ModuleRegistry, themeQuartz } from 'ag-grid-community';
+import { AgGridReact } from 'ag-grid-react';
+import UploadPDF from './UploadPdf';
 import AddTransaction from './AddTransaction';
+import Toast from './Toast';
+import DateRangeBar from './DateRangeBar';
+import InfoTip from './InfoTip';
+import usePersistedDate from './usePersistedDate';
+import {
+    API, CATEGORIES, EXCLUDED, INCOME, SAVINGS, EXPLAIN, money, signedMoney, titleCase, moneyFlow, storedAmount, isCard, pct,
+} from './finance';
+
 ModuleRegistry.registerModules([AllCommunityModule]);
 
+const gridTheme = themeQuartz.withParams({
+    accentColor: '#1976d2',
+    headerBackgroundColor: '#f7f8fa',
+    headerFontWeight: 600,
+    rowHoverColor: '#f3f6fb',
+    selectedRowBackgroundColor: '#e8f0fe',
+    borderColor: '#e6e8eb',
+    wrapperBorderRadius: 8,
+    fontFamily: 'inherit',
+    rowHeight: 44,
+});
+
+const StatTile = ({ label, value, color, sub, info }) => (
+    <Paper variant="outlined" sx={{ px: 2, py: 1.5, boxSizing: 'border-box', height: '100%' }}>
+        <Typography variant="caption" color="text.secondary">{label}{info && <InfoTip text={info} />}</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 600, color: color || 'text.primary', lineHeight: 1.3 }}>{value}</Typography>
+        {sub && <Typography variant="caption" color="text.secondary">{sub}</Typography>}
+    </Paper>
+);
 
 const TransactionsTab = () => {
-    const [fromDate, setFromDate] = useState(null);
-    const [toDate, setToDate] = useState(null);
-    const [openDialog, setOpenDialog] = useState(false);
-    const [openTransactionDialog, setOpenTransactionDialog] = useState(false);
-    const [rowData, setRowData] = useState([]);
-    const [selectedTransactionIds, setSelectedTransactionIds] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [deleteDialog, setDeleteDialog] = useState(false);
-    const [summary, setSummary] = useState({
-        total_income: 0,
-        total_expense: 0,
-        refunds: 0,
-        credit_card_expense: 0,
-        net_position: 0
-    });
-    const handleToastClose = (event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setToast({ ...toast, open: false });
-    };
-    const [toast, setToast] = useState({
-        open: false,
-        message: '',
-        severity: 'success'
-    });
-    // Categories for dropdown
-    const categories = [
-        'paycheck', 'other income', 'transfer', 'credit card payment',
-        'home', 'utilities', 'rent', 'auto', 'gas', 'parking', 'travel',
-        'restaurant', 'groceries', 'medical', 'amazon', 'walmart',
-        'shopping', 'subscriptions', 'donations', 'insurance',
-        'investments', 'other expenses', 'cash'
-    ];
+    // Shared with the Categories tab and remembered across reloads
+    const [fromDate, setFromDate] = usePersistedDate('bankbuddy.fromDate');
+    const [toDate, setToDate] = usePersistedDate('bankbuddy.toDate');
+    const [rows, setRows] = useState([]);
+    const [summary, setSummary] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
 
-    const fetchFinancialSummary = async () => {
-        if (!fromDate || !toDate) return;
+    // Filters
+    const [search, setSearch] = useState('');
+    const [account, setAccount] = useState('all');
+    const [categories, setCategories] = useState([]);
+    const [direction, setDirection] = useState('all');
+    const [hideMoves, setHideMoves] = useState(false);
 
-        try {
-            const response = await fetch(
-                `http://127.0.0.1:5000/api/financial-summary?fromDate=${fromDate.format('YYYY-MM-DD')}&toDate=${toDate.format('YYYY-MM-DD')}`
-            );
+    // Selection + dialogs
+    const gridRef = useRef(null);
+    const [selected, setSelected] = useState([]);
+    const [bulkCategory, setBulkCategory] = useState(null);
+    const [confirmBulk, setConfirmBulk] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [openUpload, setOpenUpload] = useState(false);
+    const [openAdd, setOpenAdd] = useState(false);
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch financial summary');
-            }
+    const notify = (message, severity = 'success') => setToast({ open: true, message, severity });
+    const datesValid = fromDate?.isValid() && toDate?.isValid() && !fromDate.isAfter(toDate);
+    const qs = () => `fromDate=${fromDate.format('YYYY-MM-DD')}&toDate=${toDate.format('YYYY-MM-DD')}`;
 
-            const data = await response.json();
-            setSummary(data);
-        } catch (error) {
-            setToast({
-                open: true,
-                message: error.message,
-                severity: 'error'
-            });
-        }
+    const loadSummary = async () => {
+        if (!datesValid) return;
+        const res = await fetch(`${API}/financial-summary?${qs()}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load summary');
+        setSummary(data);
     };
 
-    const fetchTransactions = async () => {
-        if (!fromDate || !toDate) return;
+    const load = async () => {
+        if (!datesValid) return;
+        setLoading(true);
         try {
-            const response = await fetch(
-                `http://127.0.0.1:5000/api/get-transactions?fromDate=${fromDate.format('YYYY-MM-DD')}&toDate=${toDate.format('YYYY-MM-DD')}`
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to fetch transactions.');
-            }
-
-            const data = await response.json();
-            setRowData(data.transactions);
-
-            setToast({
-                open: true,
-                message: "Transactions retrieved successfully!",
-                severity: 'success'
-            });
-
+            const [txRes] = await Promise.all([fetch(`${API}/get-transactions?${qs()}`), loadSummary()]);
+            const data = await txRes.json();
+            if (!txRes.ok) throw new Error(data.error || 'Failed to load transactions');
+            setRows(data.transactions.map((t) => ({ ...t, flow: moneyFlow(t) })));
         } catch (error) {
-            setToast({
-                open: true,
-                message: error.message,
-                severity: 'error'
-            });
-        }
-    }
-
-    // Handle delete transactions
-    const handleDeleteTransactions = async () => {
-        if (selectedTransactionIds.length === 0) return;
-
-        setIsLoading(true);
-
-        try {
-            const response = await fetch('http://127.0.0.1:5000/api/delete-transaction', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ transaction_ids: selectedTransactionIds }),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || 'Failed to delete transactions');
-            }
-
-            setToast({
-                open: true,
-                message: `Successfully deleted ${selectedTransactionIds.length} transaction(s).`,
-                severity: 'success',
-            });
-
-            // Optionally, refresh the grid data after deletion
-            const newRowData = rowData.filter(
-                row => !selectedTransactionIds.includes(row.transaction_id)
-            );
-            setRowData(newRowData);
-
-        } catch (error) {
-            setToast({
-                open: true,
-                message: error.message,
-                severity: 'error',
-            });
+            notify(error.message, 'error');
         } finally {
-            setIsLoading(false);
-        }
-    };
-    const onCellValueChanged = async (params) => {
-        const { data, colDef, newValue } = params;
-        const fieldName = colDef.field;
-
-        try {
-            const response = await fetch('http://127.0.0.1:5000/api/update-transaction', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    transaction_id: data.transaction_id,
-                    field: fieldName,
-                    value: newValue
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update transaction');
-            }
-
-            setToast({
-                open: true,
-                message: 'Transaction updated successfully!',
-                severity: 'success'
-            });
-
-        } catch (error) {
-            setToast({
-                open: true,
-                message: error.message,
-                severity: 'error'
-            });
-            // Refresh the grid to revert changes if update failed
-            fetchTransactions();
+            setLoading(false);
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    // Reload whenever the date range changes (including the remembered range on open)
+    useEffect(() => {
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fromDate?.format('YYYY-MM-DD'), toDate?.format('YYYY-MM-DD')]);
 
-        if (!fromDate || !toDate) {
-            setToast({
-                open: true,
-                message: "Please select both fromDate and a toDate",
-                severity: 'warning'
-            });
-            return;
-        }
-        setIsLoading(true);
-        try {
-            await Promise.all([
-                fetchTransactions(),
-                fetchFinancialSummary()
-            ]);
+    const accounts = useMemo(() => {
+        const seen = new Map();
+        rows.forEach((t) => seen.set(t.account_id, `${t.account_name} ··${t.last_4_digits}`));
+        return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    }, [rows]);
 
-        } catch (error) {
-            setToast({
-                open: true,
-                message: error.message,
-                severity: 'error'
-            });
-        } finally {
-            setIsLoading(false);
-        }
+    const visible = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return rows.filter((t) =>
+            (account === 'all' || t.account_id === account) &&
+            (categories.length === 0 || categories.includes(t.category)) &&
+            (direction === 'all' || (direction === 'out' ? t.flow < 0 : t.flow > 0)) &&
+            (!hideMoves || !EXCLUDED.has(t.category)) &&
+            (!q || [t.description, t.comment, t.category, t.account_name].some((v) => v && v.toLowerCase().includes(q)))
+        );
+    }, [rows, search, account, categories, direction, hideMoves]);
 
-    }
-
-    const handleClickTransactionOpen = () => {
-        setOpenTransactionDialog(true);
-    }
-
-    const handleClickTransactionClose = () => {
-        setOpenTransactionDialog(false);
-    }
-
-    const handleClickOpen = () => {
-        setOpenDialog(true);
-    };
-    const handleClose = () => {
-        setOpenDialog(false);
-    };
-
-    const handleDeleteDialogOpen = () => {
-        setDeleteDialog(true);
-    };
-    const handleDeleteDialogClose = () => {
-        setDeleteDialog(false);
-    };
-
-    const formatCurrency = (amount) => {
-        return amount.toLocaleString('en-US', {
-            style: 'currency',
-            currency: 'USD'
+    // Card charges per card for the whole date range (same rule as the summary:
+    // purchases in spending categories, not payments/transfers/savings)
+    const cardSpending = useMemo(() => {
+        const byCard = new Map();
+        rows.forEach((t) => {
+            if (!isCard(t) || t.flow >= 0 || EXCLUDED.has(t.category) || INCOME.has(t.category) || SAVINGS.has(t.category)) return;
+            const key = `${t.account_name} ··${t.last_4_digits}`;
+            byCard.set(key, (byCard.get(key) || 0) - t.flow);
         });
+        return [...byCard.entries()].sort((a, b) => b[1] - a[1]);
+    }, [rows]);
+
+    const totals = useMemo(() => visible.reduce((acc, t) => {
+        if (t.flow > 0) acc.in += t.flow; else acc.out += -t.flow;
+        return acc;
+    }, { in: 0, out: 0 }), [visible]);
+
+    const filtersActive = search || account !== 'all' || categories.length || direction !== 'all' || hideMoves;
+    const clearFilters = () => { setSearch(''); setAccount('all'); setCategories([]); setDirection('all'); setHideMoves(false); };
+
+    // ---- editing ----
+    const saveField = async (transactionId, field, value) => {
+        const res = await fetch(`${API}/update-transaction`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transaction_id: transactionId, field, value }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Failed to update transaction');
+        }
     };
 
-    const rowSelection = useMemo(() => {
-        return {
-            mode: "multiRow",
-        };
-    }, []);
-
-    // AG Grid Selection Changed Event
-    const onSelectionChanged = (event) => {
-        const selectedRows = event.api.getSelectedRows();
-        const selectedIds = selectedRows.map(row => row.transaction_id);
-        setSelectedTransactionIds(selectedIds);
+    const onCellValueChanged = async ({ data, colDef }) => {
+        // The Amount column shows money flow; the backend stores card charges as positive
+        const field = colDef.field === 'flow' ? 'amount' : colDef.field;
+        const value = colDef.field === 'flow' ? storedAmount(data, data.flow) : data[colDef.field];
+        try {
+            await saveField(data.transaction_id, field, value);
+            if (field === 'amount') data.amount = value;
+            setRows((prev) => prev.map((t) => (t.transaction_id === data.transaction_id ? { ...data } : t)));
+            notify('Saved');
+            loadSummary().catch(() => {});
+        } catch (error) {
+            notify(error.message, 'error');
+            load();
+        }
     };
 
-    // AG Grid column definitions
-    const [columnDefs] = useState([
+    const applyBulkCategory = async () => {
+        if (!bulkCategory) return;
+        setLoading(true);
+        try {
+            await Promise.all(selected.map((t) => saveField(t.transaction_id, 'category', bulkCategory)));
+            const ids = new Set(selected.map((t) => t.transaction_id));
+            setRows((prev) => prev.map((t) => (ids.has(t.transaction_id) ? { ...t, category: bulkCategory } : t)));
+            notify(`Moved ${selected.length} transaction${selected.length === 1 ? '' : 's'} to ${titleCase(bulkCategory)}`);
+            setBulkCategory(null);
+            gridRef.current?.api.deselectAll();
+            loadSummary().catch(() => {});
+        } catch (error) {
+            notify(error.message, 'error');
+            load();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deleteSelected = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API}/delete-transaction`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transaction_ids: selected.map((t) => t.transaction_id) }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || data.error || 'Failed to delete transactions');
+            const ids = new Set(selected.map((t) => t.transaction_id));
+            setRows((prev) => prev.filter((t) => !ids.has(t.transaction_id)));
+            notify(`Deleted ${ids.size} transaction${ids.size === 1 ? '' : 's'}`);
+            setSelected([]);
+            loadSummary().catch(() => {});
+        } catch (error) {
+            notify(error.message, 'error');
+        } finally {
+            setConfirmDelete(false);
+            setLoading(false);
+        }
+    };
+
+    const columnDefs = useMemo(() => [
         {
-            field: 'transaction_date',
-            headerName: 'Date',
-            filter: true,
-            editable: true,
+            field: 'transaction_date', headerName: 'Date', width: 125, sort: 'desc', editable: true,
             cellEditor: 'agDateStringCellEditor',
-            valueFormatter: params => {
-                if (!params.value) return '';
-                return new Date(params.value).toISOString().split('T')[0];
-            },
-            valueSetter: params => {
-                const newDate = params.newValue;
-                if (!newDate) return false;
-                params.data.transaction_date = new Date(newDate).toISOString().split('T')[0];
-                return true;
-            }
-        },
-        { field: 'description', headerName: 'Description', filter: true, flex: 2, editable: true },
-        {
-            field: 'amount', headerName: 'Amount', filter: true, editable: true,
-            cellStyle: params => {
-                const { account_type, amount } = params.data;
-
-                if (account_type === 'checking/savings') {
-                    // Positive amounts are green
-                    return {
-                        color: amount > 0 ? 'green' : 'black',
-                        fontWeight: '300'
-                    };
-                } else if (account_type === 'credit/debit') {
-                    // Negative amounts are green
-                    return {
-                        color: amount < 0 ? 'green' : 'black',
-                        fontWeight: '300'
-                    };
-                }
-
-                // Default style
-                return {
-                    color: 'black',
-                    fontWeight: '300'
-                };
-            },
-            valueFormatter: params => {
-                const value = params.value;
-                const formattedValue = Math.abs(value).toLocaleString('en-US', {
-                    style: 'currency',
-                    currency: 'USD'
-                });
-                return value < 0 ? `-${formattedValue}` : formattedValue;
-            },
-            valueSetter: params => {
-                const newValue = parseFloat(params.newValue);
-                if (isNaN(newValue)) return false;
-                params.data.amount = newValue;
-                return true;
-            }
         },
         {
-            field: 'category', headerName: 'Category', filter: true,
-            editable: true,
-            pivot: true,
-            cellEditor: 'agSelectCellEditor',
-            cellEditorParams: {
-                values: categories
-            }
+            field: 'description', headerName: 'Description', flex: 2, minWidth: 220, editable: true,
+            tooltipField: 'description',
         },
-        { field: 'account_name', headerName: 'Account Name', filter: true },
-        { field: 'account_institution', headerName: 'Institution', filter: true },
-        { field: 'last_4_digits', headerName: 'Last 4 Digits', filter: true },
-        { field: 'account_type', headerName: 'Account Type', filter: true },
-        { field: 'comment', headerName: 'Comment', filter: true, editable: true },
-    ]);
+        {
+            field: 'category', headerName: 'Category', width: 175, editable: true,
+            cellEditor: 'agSelectCellEditor', cellEditorParams: { values: CATEGORIES },
+            valueFormatter: (p) => titleCase(p.value),
+            cellRenderer: (p) => (
+                <Chip size="small" label={titleCase(p.value)} variant="outlined"
+                    sx={{ borderRadius: 1.5, color: 'text.secondary', cursor: 'pointer' }} />
+            ),
+        },
+        {
+            headerName: 'Account', width: 170,
+            valueGetter: (p) => `${p.data.account_name} ··${p.data.last_4_digits}`,
+            tooltipValueGetter: (p) => `${p.data.account_institution} · ${p.data.account_type}`,
+        },
+        {
+            field: 'flow', headerName: 'Amount', width: 140, type: 'rightAligned', editable: true,
+            valueFormatter: (p) => signedMoney(p.value),
+            valueParser: (p) => {
+                const n = parseFloat(String(p.newValue).replace(/[^0-9.-]/g, ''));
+                return Number.isNaN(n) ? p.oldValue : n;
+            },
+            cellStyle: (p) => ({ color: p.value > 0 ? '#2e7d32' : '#b3261e', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }),
+            headerTooltip: 'Money in (+) or out (−). Double-click to edit.',
+        },
+        { field: 'comment', headerName: 'Comment', flex: 1, minWidth: 140, editable: true, tooltipField: 'comment' },
+    ], []);
+
+    const selectedTotal = selected.reduce((s, t) => s + t.flow, 0);
+    const selectedIn = selected.reduce((s, t) => s + Math.max(t.flow, 0), 0);
+    const selectedOut = selected.reduce((s, t) => s + Math.max(-t.flow, 0), 0);
+    // What the selection is made of, shown before a bulk change
+    const selectedBreakdown = useMemo(() => {
+        const counts = {};
+        selected.forEach((t) => { counts[t.category] = (counts[t.category] || 0) + 1; });
+        return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    }, [selected]);
 
     return (
-        <Paper sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <Box>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DatePicker
-                        label="From Date"
-                        value={fromDate}
-                        onChange={setFromDate}
-                    />
-                    <DatePicker
-                        sx={{ ml: 2 }}
-                        label="To Date"
-                        value={fromDate}
-                        minDate={fromDate}
-                        onChange={setToDate}
-                    />
-                </LocalizationProvider>
-                <Button
-                    sx={{ ml: 2 }}
-                    variant="contained"
-                    onClick={handleSubmit}
-                    disabled={isLoading}
-                >
-                    {isLoading ? "Loading..." : "Generate Report"}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <DateRangeBar fromDate={fromDate} toDate={toDate} setFromDate={setFromDate} setToDate={setToDate}
+                onReload={load} loading={loading}>
+                <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setOpenAdd(true)}>Add</Button>
+                <Button variant="contained" startIcon={<CloudUploadIcon />} onClick={() => setOpenUpload(true)}>
+                    Upload statement
                 </Button>
-                <Button
-                    sx={{ float: "right", ml: 2 }}
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={handleClickTransactionOpen}
-                >
-                    Add Transaction
-                </Button>
-                <Button
-                    sx={{ ml: 2 }}
-                    onClick={handleDeleteDialogOpen}
-                    variant="contained"
-                    color="error"
-                    disabled={selectedTransactionIds.length === 0 || isLoading}
-                    startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
-                >
-                    {isLoading ? 'Deleting...' : selectedTransactionIds.length > 1 ? 'Delete Transactions' : 'Delete Transaction'}
-                </Button>
-                <Button
-                    sx={{ float: "right" }}
-                    variant="contained"
-                    startIcon={<CloudUploadIcon />}
-                    onClick={handleClickOpen}
-                >
-                    Upload Statement
-                </Button>
-                <UploadPDF
-                    open={openDialog}
-                    onClose={handleClose}
+            </DateRangeBar>
+
+            {summary && datesValid && (
+                <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' } }}>
+                    <StatTile label="Income" value={money(summary.total_income)} color="success.main" info={EXPLAIN.income} />
+                    <StatTile label="Spending" value={money(summary.total_expense)} color="error.main" info={EXPLAIN.spending}
+                        sub={`${money(summary.refunds)} refunded`} />
+                    <Tooltip arrow placement="bottom" title={
+                        cardSpending.length ? (
+                            <Box sx={{ py: 0.5 }}>
+                                {cardSpending.map(([card, amount]) => (
+                                    <Box key={card} sx={{ display: 'flex', justifyContent: 'space-between', gap: 3 }}>
+                                        <span>{card}</span><b>{money(amount)}</b>
+                                    </Box>
+                                ))}
+                                <Box sx={{ mt: 0.5, opacity: 0.8 }}>Purchases only — card payments and transfers excluded</Box>
+                            </Box>
+                        ) : 'No card purchases in this period'
+                    }>
+                        <Box>
+                            <StatTile label="Credit card spending" value={money(summary.credit_card_expense)} color="error.main" info={EXPLAIN.cardSpending}
+                                sub={`${pct(summary.credit_card_expense, summary.total_expense + summary.refunds)} of spending · hover for each card`} />
+                        </Box>
+                    </Tooltip>
+                    <StatTile label="Net position" value={money(summary.net_position)} info={EXPLAIN.netPosition}
+                        color={summary.net_position >= 0 ? 'success.main' : 'error.main'} />
+                    <StatTile label="Invested + Marcus" value={money(summary.net_invested + summary.marcus_net)} info={EXPLAIN.investedPlusMarcus}
+                        sub={`${money(summary.net_invested)} invested · ${money(summary.marcus_net)} Marcus`} />
+                </Box>
+            )}
+
+            {/* Filters */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+                <TextField size="small" placeholder="Search description, comment, category…" value={search}
+                    onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 300, flex: '1 1 300px', maxWidth: 420 }}
+                    slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }} />
+                <TextField select size="small" label="Account" value={account} onChange={(e) => setAccount(e.target.value)} sx={{ width: 200 }}>
+                    <MenuItem value="all">All accounts</MenuItem>
+                    {accounts.map(([id, label]) => <MenuItem key={id} value={id}>{label}</MenuItem>)}
+                </TextField>
+                <Autocomplete multiple size="small" options={CATEGORIES} value={categories} onChange={(_, v) => setCategories(v)}
+                    getOptionLabel={titleCase} limitTags={2} sx={{ width: 300 }}
+                    renderInput={(params) => <TextField {...params} label="Categories" />} />
+                <ToggleButtonGroup size="small" exclusive value={direction} onChange={(_, v) => v && setDirection(v)}>
+                    <ToggleButton value="all">All</ToggleButton>
+                    <ToggleButton value="out">Money out</ToggleButton>
+                    <ToggleButton value="in">Money in</ToggleButton>
+                </ToggleButtonGroup>
+                <Tooltip title="Credit card payments and transfers between your own accounts">
+                    <Chip label="Hide transfers & card payments" onClick={() => setHideMoves(!hideMoves)}
+                        color={hideMoves ? 'primary' : 'default'} variant={hideMoves ? 'filled' : 'outlined'} />
+                </Tooltip>
+                {filtersActive && (
+                    <Button size="small" startIcon={<FilterAltOffOutlinedIcon />} onClick={clearFilters}>Clear</Button>
+                )}
+            </Box>
+
+            {/* Result line, or bulk actions while rows are selected */}
+            {selected.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                    {visible.length} transaction{visible.length === 1 ? '' : 's'}
+                    {visible.length !== rows.length && ` of ${rows.length}`} ·
+                    <Box component="span" sx={{ color: 'success.main', mx: 0.5 }}>{signedMoney(totals.in)} in</Box>·
+                    <Box component="span" sx={{ color: 'error.main', mx: 0.5 }}>{signedMoney(-totals.out)} out</Box>
+                    <InfoTip text={EXPLAIN.visibleTotals} />
+                    <Box component="span" sx={{ ml: 'auto' }}>Double-click a cell to edit · select rows for bulk actions</Box>
+                </Typography>
+            ) : (
+                <Paper elevation={0} sx={{
+                    display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, minHeight: 40,
+                    bgcolor: '#e8f0fe', borderRadius: 2,
+                }}>
+                    <IconButton size="small" onClick={() => gridRef.current?.api.deselectAll()} aria-label="Clear selection">
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{selected.length} selected</Typography>
+                    <Typography variant="body2" sx={{ display: 'flex', gap: 1, fontVariantNumeric: 'tabular-nums' }}>
+                        <Box component="span" sx={{ color: 'success.main' }}>{signedMoney(selectedIn)} in</Box>·
+                        <Box component="span" sx={{ color: 'error.main' }}>{signedMoney(-selectedOut)} out</Box>·
+                        <Box component="span" sx={{ fontWeight: 600 }}>net {signedMoney(selectedTotal)}</Box>
+                        <InfoTip text={EXPLAIN.selectedTotals} />
+                    </Typography>
+                    <Box sx={{ ml: 'auto', display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <Autocomplete size="small" options={CATEGORIES} value={bulkCategory} onChange={(_, v) => setBulkCategory(v)}
+                            getOptionLabel={titleCase} sx={{ width: 220, bgcolor: 'background.paper' }}
+                            renderInput={(params) => <TextField {...params} placeholder="Set category…" />} />
+                        <Button size="small" variant="contained" startIcon={<LabelOutlinedIcon />}
+                            disabled={!bulkCategory || loading} onClick={() => setConfirmBulk(true)}>Apply</Button>
+                        <Button size="small" color="error" startIcon={<DeleteOutlineIcon />}
+                            disabled={loading} onClick={() => setConfirmDelete(true)}>Delete</Button>
+                    </Box>
+                </Paper>
+            )}
+
+            <Box sx={{ position: 'relative', height: 'calc(100vh - 330px)', minHeight: 420 }}>
+                {loading && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }} />}
+                <AgGridReact
+                    ref={gridRef}
+                    theme={gridTheme}
+                    rowData={visible}
+                    columnDefs={columnDefs}
+                    getRowId={(p) => String(p.data.transaction_id)}
+                    defaultColDef={{ sortable: true, resizable: true, filter: true }}
+                    rowSelection={{ mode: 'multiRow', selectAll: 'currentPage' }}
+                    onSelectionChanged={(e) => setSelected(e.api.getSelectedRows())}
+                    onCellValueChanged={onCellValueChanged}
+                    pagination paginationPageSize={50} paginationPageSizeSelector={[25, 50, 100, 200]}
+                    tooltipShowDelay={400}
+                    stopEditingWhenCellsLoseFocus
+                    overlayNoRowsTemplate={datesValid
+                        ? '<span style="color:#666">No transactions match these filters.</span>'
+                        : '<span style="color:#666">Pick a date range or a preset above.</span>'}
                 />
             </Box>
-            <Dialog
-                open={deleteDialog}
-                onClose={handleDeleteDialogClose}
-            >
-                <DialogTitle>Confirm Delete</DialogTitle>
+
+            <Dialog open={confirmBulk} onClose={() => setConfirmBulk(false)}>
+                <DialogTitle>
+                    Change {selected.length} transaction{selected.length === 1 ? '' : 's'} to {titleCase(bulkCategory)}?
+                </DialogTitle>
                 <DialogContent>
-                    Are you sure you want to delete selected transactions? This action cannot be undone.
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Selected total: {signedMoney(selectedIn)} in · {signedMoney(-selectedOut)} out · net <b>{signedMoney(selectedTotal)}</b>
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>Their current categories:</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {selectedBreakdown.map(([cat, n]) => (
+                            <Chip key={cat} size="small" variant="outlined" label={`${titleCase(cat)} · ${n}`} />
+                        ))}
+                    </Box>
+                    {selected.length > 50 && (
+                        <Typography variant="body2" color="error.main" sx={{ mt: 2 }}>
+                            That's a lot of transactions — make sure you meant to select all of them.
+                        </Typography>
+                    )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleDeleteDialogClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleDeleteTransactions}
-                        color="error"
-                        variant="contained"
-                        disabled={selectedTransactionIds.length === 0 || isLoading}
-                        startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
-                    >
-                        {isLoading ? 'Deleting...' : selectedTransactionIds.length > 1 ? 'Delete Transactions' : 'Delete Transaction'}
+                    <Button onClick={() => setConfirmBulk(false)}>Cancel</Button>
+                    <Button variant="contained" disabled={loading}
+                        onClick={() => { setConfirmBulk(false); applyBulkCategory(); }}>
+                        Change {selected.length}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            <Box sx={{ p: 2, bgcolor: '#f5f5f5' }}>
-                <Grid2 container spacing={2}>
-                    <Grid2 item xs={12}>
-                        <Typography variant="h6" gutterBottom>
-                            Financial Summary
-                        </Typography>
-                    </Grid2>
-                    <Grid2 item xs={12} md={2}>
-                        <Typography variant="subtitle2">Total Income</Typography>
-                        <Typography variant="body1" color="success.main">
-                            {formatCurrency(summary.total_income)}
-                        </Typography>
-                    </Grid2>
-                    <Grid2 item xs={12} md={2}>
-                        <Typography variant="subtitle2">Total Expense</Typography>
-                        <Typography variant="body1" color="error.main">
-                            {formatCurrency(summary.total_expense)}
-                        </Typography>
-                    </Grid2>
-                    <Grid2 item xs={12} md={2}>
-                        <Typography variant="subtitle2">Net Position</Typography>
-                        <Typography
-                            variant="body1"
-                            color={summary.net_position >= 0 ? "success.main" : "error.main"}
-                        >
-                            {formatCurrency(summary.net_position)}
-                        </Typography>
-                    </Grid2>
-                    <Grid2 item xs={12} md={2}>
-                        <Typography variant="subtitle2">Credit Card Expense</Typography>
-                        <Typography variant="body1" color="error.main">
-                            {formatCurrency(summary.credit_card_expense)}
-                        </Typography>
-                    </Grid2>
-                    <Grid2 item xs={12} md={2}>
-                        <Typography variant="subtitle2">Refunds</Typography>
-                        <Typography variant="body1" color="success.main">
-                            {formatCurrency(summary.refunds)}
-                        </Typography>
-                    </Grid2>
-                </Grid2>
-            </Box>
+            <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)}>
+                <DialogTitle>Delete {selected.length} transaction{selected.length === 1 ? '' : 's'}?</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2">
+                        Net {signedMoney(selectedTotal)}. This can't be undone (a daily database backup is kept in <code>backups/</code>).
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConfirmDelete(false)}>Cancel</Button>
+                    <Button color="error" variant="contained" onClick={deleteSelected} disabled={loading}
+                        startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <DeleteOutlineIcon />}>
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
-            <Box sx={{ flex: 1, p: 2 }}>
-                <div className="ag-theme-material" style={{ height: '100%', width: '100%' }}>
-                    <AgGridReact
-                        rowData={rowData}
-                        columnDefs={columnDefs}
-                        pagination={true}
-                        paginationPageSize={20}
-                        paginationPageSizeSelector={[20, 50, 100]}
-                        rowSelection={rowSelection}
-                        onSelectionChanged={onSelectionChanged}
-                        defaultColDef={{
-                            flex: 1,
-                            minWidth: 100,
-                            filter: true,
-                            sortable: true,
-                        }}
-                        onCellValueChanged={onCellValueChanged}
-                    />
-
-                </div>
-            </Box>
-            <AddTransaction
-                open={openTransactionDialog}
-                onClose={handleClickTransactionClose}
-                categories={categories}
-            />
-            <Toast
-                open={toast.open}
-                message={toast.message}
-                severity={toast.severity}
-                onClose={handleToastClose}
-            />
-        </Paper>
+            {/* Reload after adding or uploading so new rows show up */}
+            <UploadPDF open={openUpload} onClose={() => { setOpenUpload(false); load(); }} />
+            <AddTransaction open={openAdd} onClose={() => { setOpenAdd(false); load(); }} categories={CATEGORIES} />
+            <Toast open={toast.open} message={toast.message} severity={toast.severity}
+                onClose={(_, reason) => reason !== 'clickaway' && setToast({ ...toast, open: false })} />
+        </Box>
     );
 };
 

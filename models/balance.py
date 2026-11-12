@@ -8,7 +8,7 @@ class Balance(db.Model):
     account_id = db.Column(db.Integer, db.ForeignKey('accounts.account_id'), nullable=False)
     balance = db.Column(db.Float, nullable=False)
     statement_date = db.Column(db.Date, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
 
     @classmethod
     def add_balance(cls, account_id, balance, statement_date):

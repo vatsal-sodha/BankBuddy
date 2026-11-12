@@ -4,3 +4,5 @@ node_modules
 **.db
 backups
 .DS_Store
+# Personal category hints for the Claude prompt
+*.local.txt
