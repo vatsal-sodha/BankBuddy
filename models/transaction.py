@@ -11,8 +11,8 @@ class Transaction(db.Model):
     description = db.Column(db.String(255), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     amount = db.Column(db.Float, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)  # Renamed to created_at
-    last_modified_time = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.UTC), nullable=True)  # Renamed to last_modified_time, only updates on modification
+    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)  # Renamed to created_at
+    last_modified_time = db.Column(db.DateTime, onupdate=lambda: datetime.datetime.now(datetime.UTC), nullable=True)  # Renamed to last_modified_time, only updates on modification
     comment = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
