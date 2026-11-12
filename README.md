@@ -108,6 +108,21 @@ npm install
 npm start
 ```
 
+## Running Tests
+
+Backend tests (pytest) run against a throwaway SQLite database and a fake Claude client, so they never touch `instance/bankBuddy.db` or call the API:
+```bash
+conda activate bankbuddy
+pip install -r requirements-dev.txt
+pytest
+```
+
+Frontend tests (Vitest, Node 20+):
+```bash
+cd bankbuddyui
+npm test
+```
+
 ## Support
 
 For issues or questions, please [create an issue](https://github.com/vatsal-sodha/BankBuddy/issues) in the repository.
